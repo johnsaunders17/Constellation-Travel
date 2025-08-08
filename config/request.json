@@ -1,0 +1,14 @@
+{
+  "origin": "EMA",
+  "destination": "ALC",
+  "destinationCity": "Benidorm",
+  "startDate": "2025-08-25",
+  "nights": 4,
+  "adults": 2,
+  "children": 0,
+  "board": "HB",
+  "minStars": 4,
+  "budgetPerPerson": 700,
+  "flexibility": 1,
+  "baggage": "hand"
+}
