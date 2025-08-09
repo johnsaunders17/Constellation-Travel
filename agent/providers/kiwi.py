@@ -1,27 +1,33 @@
 import os
+from datetime import datetime
 import requests
 
 def get_kiwi_deals(params):
     key = os.getenv("RAPIDAPI_KIWI_KEY")
+    if not key:
+        raise RuntimeError("RAPIDAPI_KIWI_KEY environment variable is not set")
+
     url = "https://kiwi-com-cheap-flights.p.rapidapi.com/search"
 
     headers = {
         "X-RapidAPI-Key": key,
-        "X-RapidAPI-Host": "kiwi-com-cheap-flights.p.rapidapi.com"
+        "X-RapidAPI-Host": "kiwi-com-cheap-flights.p.rapidapi.com",
     }
+
+    formatted_date = datetime.strptime(params["startDate"], "%Y-%m-%d").strftime("%d/%m/%Y")
 
     querystring = {
         "fly_from": params["origin"],
         "fly_to": params["destination"],
-        "date_from": params["startDate"],
-        "date_to": params["startDate"],
+        "date_from": formatted_date,
+        "date_to": formatted_date,
         "nights_in_dst_from": params["nights"],
         "nights_in_dst_to": params["nights"],
         "adults": params["adults"],
         "children": params["children"],
         "selected_cabins": "M",
         "curr": "GBP",
-        "limit": 3
+        "limit": 3,
     }
 
     try:
