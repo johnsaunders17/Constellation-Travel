@@ -1,6 +1,9 @@
 import os
 from datetime import datetime
+import logging
 import requests
+
+logger = logging.getLogger(__name__)
 
 def get_kiwi_deals(params):
     key = os.getenv("RAPIDAPI_KIWI_KEY")
@@ -34,8 +37,8 @@ def get_kiwi_deals(params):
         response = requests.get(url, headers=headers, params=querystring)
         response.raise_for_status()
         results = response.json().get("data", [])
-    except Exception as e:
-        print(f"[Kiwi] API call failed: {e}")
+    except Exception:
+        logger.exception("[Kiwi] API call failed")
         return []
 
     output = []

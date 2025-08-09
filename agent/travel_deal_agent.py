@@ -2,6 +2,7 @@ import os
 import json
 import argparse
 from datetime import datetime
+import requests
 from providers.kiwi import get_kiwi_deals
 from providers.amadeus import get_amadeus_hotels
 
@@ -23,11 +24,19 @@ def save_results(data, output_dir="results"):
 
 def evaluate_deals(params):
     print("[INFO] Fetching flight data via Kiwi...")
-    flights = get_kiwi_deals(params)
+    try:
+        flights = get_kiwi_deals(params)
+    except requests.HTTPError as e:
+        print(f"[ERROR] Kiwi provider HTTP error: {e}")
+        flights = []
     print(f"[INFO] Found {len(flights)} flight options.")
 
     print("[INFO] Fetching hotel data via Amadeus...")
-    hotels = get_amadeus_hotels(params)
+    try:
+        hotels = get_amadeus_hotels(params)
+    except requests.HTTPError as e:
+        print(f"[ERROR] Amadeus provider HTTP error: {e}")
+        hotels = []
     print(f"[INFO] Found {len(hotels)} hotel options.")
 
     results = []
