@@ -5,6 +5,8 @@ from datetime import datetime, timedelta
 
 logger = logging.getLogger(__name__)
 
+AMADEUS_BASE_URL = "https://test.api.amadeus.com"
+
 def get_amadeus_access_token():
     client_id = os.getenv("AMADEUS_API_KEY")
     client_secret = os.getenv("AMADEUS_API_SECRET")
@@ -12,7 +14,7 @@ def get_amadeus_access_token():
         raise RuntimeError("AMADEUS_API_KEY and AMADEUS_API_SECRET must be set")
 
     print("[INFO] Authenticating with Amadeus...")
-    url = "https://test.api.amadeus.com/v1/security/oauth2/token"
+    url = f"{AMADEUS_BASE_URL}/v1/security/oauth2/token"
     headers = { "Content-Type": "application/x-www-form-urlencoded" }
     data = {
         "grant_type": "client_credentials",
@@ -51,7 +53,7 @@ def get_amadeus_hotels(params):
     }
 
     print("[INFO] Calling Amadeus hotel offers endpoint...")
-    url = "https://test.api.amadeus.com/v3/shopping/hotel-offers"
+    url = f"{AMADEUS_BASE_URL}/v3/shopping/hotel-offers"
     try:
         res = requests.get(url, headers=headers, params=query)
         res.raise_for_status()
