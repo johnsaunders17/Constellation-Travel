@@ -44,13 +44,14 @@ def get_amadeus_hotels(params):
         "roomQuantity": 1,
         "radius": 30,
         "radiusUnit": "KM",
-        "bestRateOnly": "true",
+        # V3 expects a boolean for bestRateOnly
+        "bestRateOnly": True,
         "view": "FULL",
         "currency": "GBP"
     }
 
     print("[INFO] Calling Amadeus hotel offers endpoint...")
-    url = "https://test.api.amadeus.com/v2/shopping/hotel-offers"
+    url = "https://test.api.amadeus.com/v3/shopping/hotel-offers"
     try:
         res = requests.get(url, headers=headers, params=query)
         res.raise_for_status()
@@ -63,16 +64,15 @@ def get_amadeus_hotels(params):
 
     for item in raw_data:
         hotel = item.get("hotel", {})
-        offer = item.get("offers", [{}])[0]
-
-        results.append({
-            "provider": "Amadeus",
-            "name": hotel.get("name"),
-            "stars": hotel.get("rating", 3),
-            "rating": hotel.get("rating", 3),
-            "board": offer.get("boardType", "Unknown"),
-            "price": float(offer.get("price", {}).get("total", 0)),
-            "link": hotel.get("contact", {}).get("uri", "")
-        })
+        for offer in item.get("offers", []):
+            results.append({
+                "provider": "Amadeus",
+                "name": hotel.get("name"),
+                "stars": hotel.get("rating", 3),
+                "rating": hotel.get("rating", 3),
+                "board": offer.get("boardType", "Unknown"),
+                "price": float(offer.get("price", {}).get("total", 0)),
+                "link": hotel.get("contact", {}).get("uri", ""),
+            })
 
     return results
