@@ -1,6 +1,9 @@
 import os
+import logging
 import requests
 from datetime import datetime, timedelta
+
+logger = logging.getLogger(__name__)
 
 def get_amadeus_access_token():
     client_id = os.getenv("AMADEUS_API_KEY")
@@ -51,8 +54,8 @@ def get_amadeus_hotels(params):
     try:
         res = requests.get(url, headers=headers, params=query)
         res.raise_for_status()
-    except Exception as e:
-        print(f"[Amadeus] API call failed: {e}")
+    except Exception:
+        logger.exception("[Amadeus] API call failed")
         return []
 
     raw_data = res.json().get("data", [])
