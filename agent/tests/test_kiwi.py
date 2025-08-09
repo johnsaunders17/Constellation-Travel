@@ -37,6 +37,13 @@ def test_get_kiwi_deals_success():
       deals = get_kiwi_deals(sample_params())
   assert deals[0]["price"] == 100
   mock_get.assert_called_once()
+  called_url = mock_get.call_args[0][0]
+  called_headers = mock_get.call_args[1]["headers"]
+  called_params = mock_get.call_args[1]["params"]
+  assert called_url == "https://kiwi-com.p.rapidapi.com/v2/search"
+  assert called_headers["X-RapidAPI-Host"] == "kiwi-com.p.rapidapi.com"
+  assert called_params["date_from"] == "01/09/2024"
+  assert called_params["date_to"] == "01/09/2024"
 
 
 def test_get_kiwi_deals_error():

@@ -10,11 +10,11 @@ def get_kiwi_deals(params):
     if not key:
         raise RuntimeError("RAPIDAPI_KIWI_KEY environment variable is not set")
 
-    url = "https://kiwi-com-cheap-flights.p.rapidapi.com/search"
+    url = "https://kiwi-com.p.rapidapi.com/v2/search"
 
     headers = {
         "X-RapidAPI-Key": key,
-        "X-RapidAPI-Host": "kiwi-com-cheap-flights.p.rapidapi.com",
+        "X-RapidAPI-Host": "kiwi-com.p.rapidapi.com",
     }
 
     formatted_date = datetime.strptime(params["startDate"], "%Y-%m-%d").strftime("%d/%m/%Y")
