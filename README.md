@@ -5,6 +5,13 @@ My personal travel agent.
 ## Backend Prerequisites
 
 - Python 3.12+
+- Create and activate a virtual environment:
+
+  ```bash
+  python -m venv .venv
+  source .venv/bin/activate
+  ```
+
 - Install dependencies: `pip install -r agent/requirements.txt`
 
 ## Frontend Prerequisites
@@ -14,7 +21,8 @@ My personal travel agent.
 
 ## Environment Variables
 
-The agent relies on the following variables:
+The agent relies on the following variables, which must be set in your
+shell (or a `.env` file) before running tests or the agent itself:
 
 - `RAPIDAPI_KIWI_KEY` – RapidAPI key for Kiwi flight search
 - `AMADEUS_API_KEY` – Amadeus API key
