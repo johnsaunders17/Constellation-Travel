@@ -1,6 +1,6 @@
-# agent/providers/kiwi.py
 import os
 import requests
+from urllib.parse import quote
 
 def get_kiwi_deals(params):
     key = os.getenv("RAPIDAPI_KIWI_KEY")
@@ -8,26 +8,47 @@ def get_kiwi_deals(params):
         print("[Kiwi] Missing RAPIDAPI_KIWI_KEY")
         return []
 
-    url = "https://kiwi-com-cheap-flights.p.rapidapi.com/search"  # <-- no /v2
+    host = "kiwi-com-cheap-flights.p.rapidapi.com"
+    path = "/round-trip"
+    url = f"https://{host}{path}"
 
     headers = {
         "X-RapidAPI-Key": key,
-        "X-RapidAPI-Host": "kiwi-com-cheap-flights.p.rapidapi.com"
+        "X-RapidAPI-Host": host
     }
 
-    # RapidAPI version takes dd/mm/yyyy for date_from/date_to
+    # Map our params to this API's expected querystring
+    # Your snippet uses e.g., Country:GB or City:alicante_es
+    # We’ll assume direct city search for flights to Alicante (ALC)
+    source = f"City:{params.get('originCityCode', 'nottingham_gb')}"  # Example; you might use Country:GB
+    destination = f"City:{params.get('destinationCityCode', 'alicante_es')}"
+
     query = {
-        "fly_from": params.get("origin", "EMA"),
-        "fly_to": params.get("destination", "ALC"),
-        "date_from": _to_ddmmyyyy(params["startDate"]),
-        "date_to": _to_ddmmyyyy(params["startDate"]),
-        "nights_in_dst_from": params.get("nights", 4),
-        "nights_in_dst_to": params.get("nights", 4),
+        "source": quote(source, safe=""),
+        "destination": quote(destination, safe=""),
+        "currency": "gbp",
+        "locale": "en",
         "adults": params.get("adults", 2),
         "children": params.get("children", 0),
-        "selected_cabins": "M",
-        "curr": "GBP",
-        "limit": 3
+        "infants": 0,
+        "handbags": 1,
+        "holdbags": 0,
+        "cabinClass": "ECONOMY",
+        "sortBy": "QUALITY",
+        "sortOrder": "ASCENDING",
+        "applyMixedClasses": "true",
+        "allowReturnFromDifferentCity": "true",
+        "allowChangeInboundDestination": "true",
+        "allowChangeInboundSource": "true",
+        "allowDifferentStationConnection": "true",
+        "enableSelfTransfer": "true",
+        "allowOvernightStopover": "true",
+        "enableTrueHiddenCity": "true",
+        "enableThrowAwayTicketing": "true",
+        "outbound": "SUNDAY,WEDNESDAY,THURSDAY,FRIDAY,SATURDAY,MONDAY,TUESDAY",
+        "transportTypes": "FLIGHT",
+        "contentProviders": "KIWI",
+        "limit": 5
     }
 
     try:
@@ -42,19 +63,14 @@ def get_kiwi_deals(params):
 
     results = []
     for r in data:
-        route = r.get("route", [])
+        # This API's schema may differ — adjust as needed
         results.append({
             "provider": "Kiwi via RapidAPI",
-            "price": r.get("price", 0),
-            "carrier": (r.get("airlines") or ["?"])[0],
-            "departure": route[0].get("local_departure") if route else None,
-            "arrival": route[-1].get("local_arrival") if route else None,
-            "link": r.get("deep_link", "")
+            "price": r.get("price", {}).get("amount") if isinstance(r.get("price"), dict) else r.get("price"),
+            "carrier": r.get("carrier", "Unknown"),
+            "departure": r.get("departure"),
+            "arrival": r.get("arrival"),
+            "link": r.get("booking_link", "")
         })
 
     return results
-
-def _to_ddmmyyyy(iso_date: str) -> str:
-    # "2025-08-25" -> "25/08/2025"
-    y, m, d = iso_date.split("-")
-    return f"{d}/{m}/{y}"
