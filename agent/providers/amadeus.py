@@ -38,43 +38,61 @@ def get_amadeus_hotels(params):
     check_in = params["startDate"]
     check_out = (datetime.strptime(check_in, "%Y-%m-%d") + timedelta(days=params["nights"])).strftime("%Y-%m-%d")
 
-    query = {
-        "cityCode": "ALC",  # Alicante — closest valid Amadeus cityCode for Benidorm
+
+       # Step 1: find hotels near the city
+    list_url = f"{AMADEUS_BASE_URL}/v1/reference-data/locations/hotels/by-city"
+    list_params = {
+        "cityCode": params.get("destination", "ALC"),  # Alicante (nearest airport to Benidorm)
+        "radius": 30,
+        "radiusUnit": "KM"
+    }
+    try:
+        list_res = requests.get(list_url, headers=headers, params=list_params)
+        list_res.raise_for_status()
+    except Exception:
+        logger.exception("[Amadeus] Hotel list API call failed")
+        return []
+
+    hotels_data = list_res.json().get("data", [])
+    hotel_ids = [h.get("hotelId") for h in hotels_data if h.get("hotelId")]
+    if not hotel_ids:
+        logger.info("[Amadeus] No hotels found for city")
+        return []
+
+    # Step 2: fetch offers for those hotelIds
+    offers_url = f"{AMADEUS_BASE_URL}/v3/shopping/hotel-offers"
+    offers_params = {
+        "hotelIds": ",".join(hotel_ids[:20]),   # limit to first 20 IDs to keep URL manageable
         "checkInDate": check_in,
         "checkOutDate": check_out,
         "adults": params["adults"],
         "roomQuantity": 1,
-        "radius": 30,
-        "radiusUnit": "KM",
-        # V3 expects a boolean for bestRateOnly
-        "bestRateOnly": True,
-        "view": "FULL",
         "currency": "GBP"
     }
-
-    print("[INFO] Calling Amadeus hotel offers endpoint...")
-    url = f"{AMADEUS_BASE_URL}/v3/shopping/hotel-offers"
     try:
-        res = requests.get(url, headers=headers, params=query)
-        res.raise_for_status()
+        offers_res = requests.get(offers_url, headers=headers, params=offers_params)
+        offers_res.raise_for_status()
     except Exception:
-        logger.exception("[Amadeus] API call failed")
+        logger.exception("[Amadeus] Hotel offers API call failed")
         return []
 
-    raw_data = res.json().get("data", [])
+    raw_data = offers_res.json().get("data", [])
     results = []
-
     for item in raw_data:
         hotel = item.get("hotel", {})
-        for offer in item.get("offers", []):
+        offers = item.get("offers", [])
+        for offer in offers:
+            board = offer.get("boardType") or offer.get("description", {}).get("text", "Unknown")
+            price_total = offer.get("price", {}).get("total")
             results.append({
                 "provider": "Amadeus",
                 "name": hotel.get("name"),
                 "stars": hotel.get("rating", 3),
                 "rating": hotel.get("rating", 3),
-                "board": offer.get("boardType", "Unknown"),
-                "price": float(offer.get("price", {}).get("total", 0)),
-                "link": hotel.get("contact", {}).get("uri", ""),
+                "board": board,
+                "price": float(price_total) if price_total else 0.0,
+                "link": hotel.get("contact", {}).get("uri", "")
             })
 
     return results
+  
