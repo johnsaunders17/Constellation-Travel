@@ -2,7 +2,12 @@ import os
 import requests
 from urllib.parse import quote
 
-# Map IATA codes to this RapidAPI product's City:slug format
+# Optional overrides (handy if the vendor ever changes host/path)
+HOST = os.getenv("RAPIDAPI_KIWI_HOST", "kiwi-com-cheap-flights.p.rapidapi.com")
+PATH = os.getenv("RAPIDAPI_KIWI_PATH", "/round-trip")
+BASE_URL = f"https://{HOST}{PATH}"
+
+# Map IATA to this vendor's City:slug format
 IATA_TO_CITY = {
     "EMA": "City:nottingham_gb",
     "BHX": "City:birmingham_gb",
@@ -13,39 +18,95 @@ IATA_TO_CITY = {
     "LTN": "City:london_gb",
     "BRS": "City:bristol_gb",
     "LPL": "City:liverpool_gb",
-    "ALC": "City:alicante_es"
+    "ALC": "City:alicante_es",
 }
 
-def get_kiwi_deals(params):
-    """Fetch flight deals via RapidAPI with fallback logic.
+# Sensible origin fallbacks to increase hit rate for GB → ES leisure routes
+ORIGIN_FALLBACK_CHAIN = [
+    "EMA",            # requested
+    "BHX", "MAN",     # nearby major
+    "LHR", "LGW",     # London catch
+]
 
-    We attempt city-level queries first and fall back to country-level.
+def _iata_to_city(iata: str | None) -> str | None:
+    return IATA_TO_CITY.get((iata or "").upper())
+
+def _normalise(data_item: dict) -> dict:
+    price_info = data_item.get("price")
+    if isinstance(price_info, dict):
+        price = price_info.get("amount")
+    else:
+        price = price_info or data_item.get("totalPrice")
+
+    carrier = (
+        data_item.get("carrier")
+        or (data_item.get("airlines")[0] if isinstance(data_item.get("airlines"), list) and data_item.get("airlines") else None)
+        or data_item.get("airline")
+    )
+
+    # Try nested Tequila-style route if present
+    route = data_item.get("route")
+    if isinstance(route, list) and route:
+        departure = route[0].get("local_departure")
+        arrival = route[-1].get("local_arrival")
+    else:
+        departure = data_item.get("departure")
+        arrival = data_item.get("arrival")
+
+    link = data_item.get("booking_link") or data_item.get("deep_link") or ""
+
+    return {
+        "provider": "Kiwi via RapidAPI",
+        "price": price,
+        "carrier": carrier or "?",
+        "departure": departure,
+        "arrival": arrival,
+        "link": link,
+    }
+
+def get_kiwi_deals(params: dict) -> list[dict]:
+    """
+    Calls the RapidAPI 'round-trip' endpoint with a resilient fallback chain:
+    1) Try city slug that corresponds to the requested origin IATA (e.g., EMA→City:nottingham_gb)
+    2) Fall back to BHX, MAN, then London catch (LHR/LGW) city slugs
+    3) Finally fall back to Country:GB
+    Destination tries the requested city slug (e.g., ALC→City:alicante_es) then Country:ES.
+
+    Returns a list of normalised flight dicts or [] if nothing found.
     """
     api_key = os.getenv("RAPIDAPI_KIWI_KEY")
     if not api_key:
         print("[Kiwi] Missing RAPIDAPI_KIWI_KEY")
         return []
 
-    host = "kiwi-com-cheap-flights.p.rapidapi.com"
-    path = "/round-trip"
-    url = f"https://{host}{path}"
-
+    # Headers
     headers = {
         "X-RapidAPI-Key": api_key,
-        "X-RapidAPI-Host": host
+        "X-RapidAPI-Host": HOST,
     }
 
-    # Build candidate origin/destination selectors
-    origin_iata = params.get("origin", "EMA").upper()
-    dest_iata = params.get("destination", "ALC").upper()
-    city_origin = IATA_TO_CITY.get(origin_iata)
-    city_dest = IATA_TO_CITY.get(dest_iata)
+    # Build candidate origins
+    requested_origin_iata = (params.get("origin") or "EMA").upper()
+    origin_candidates_iata = [requested_origin_iata] + [c for c in ORIGIN_FALLBACK_CHAIN if c != requested_origin_iata]
 
-    # Try city slug if available, then fallback to country
-    sources = [s for s in (city_origin, f"Country:GB") if s]
-    destinations = [d for d in (city_dest, f"Country:ES") if d]
+    origin_candidates = []
+    for iata in origin_candidates_iata:
+        city = _iata_to_city(iata)
+        if city:
+            origin_candidates.append(city)
+    # Ensure country-level last
+    origin_candidates.append("Country:GB")
 
-    # Core RapidAPI flags (mirrors the playground example)
+    # Build candidate destinations
+    requested_dest_iata = (params.get("destination") or "ALC").upper()
+    dest_candidates = []
+    dest_city = _iata_to_city(requested_dest_iata)
+    if dest_city:
+        dest_candidates.append(dest_city)
+    # Ensure country-level last
+    dest_candidates.append("Country:ES")
+
+    # Base query (mirrors vendor playground flags; avoid over-filtering)
     base_query = {
         "currency": "gbp",
         "locale": "en",
@@ -69,58 +130,39 @@ def get_kiwi_deals(params):
         "outbound": "SUNDAY,WEDNESDAY,THURSDAY,FRIDAY,SATURDAY,MONDAY,TUESDAY",
         "transportTypes": "FLIGHT",
         "contentProviders": "KIWI",
-        "limit": params.get("limit", 5)
+        "limit": params.get("limit", 5),
     }
 
-    # Try each source/destination combination until we get data
-    for src in sources:
-        for dst in destinations:
-            query = base_query.copy()
-            query["source"] = quote(src, safe="")
-            query["destination"] = quote(dst, safe="")
+    # Try combinations until we get non-empty data
+    for src in origin_candidates:
+        for dst in dest_candidates:
+            q = base_query.copy()
+            # Some vendors require these to be URL-encoded; quote() avoids issues with ":" and "_"
+            q["source"] = quote(src, safe="")
+            q["destination"] = quote(dst, safe="")
+
             try:
-                response = requests.get(url, headers=headers, params=query, timeout=20)
-                if response.status_code != 200:
-                    # If 404 or other errors, continue to next combination
-                    print(f"[Kiwi] HTTP {response.status_code} on {src}->{dst}")
+                resp = requests.get(BASE_URL, headers=headers, params=q, timeout=25)
+                if resp.status_code != 200:
+                    # Soft-fail and try the next combo
+                    print(f"[Kiwi] HTTP {resp.status_code} for {src} -> {dst}")
                     continue
-                data = response.json().get("data", [])
+
+                payload = resp.json()
+                data = payload.get("data", payload if isinstance(payload, list) else [])
                 if not data:
+                    print(f"[Kiwi] 200 OK but empty for {src} -> {dst}")
                     continue
-                # Normalise result fields
-                results = []
-                for item in data:
-                    price_info = item.get("price")
-                    if isinstance(price_info, dict):
-                        price = price_info.get("amount")
-                    else:
-                        price = price_info or item.get("totalPrice")
-                    carrier = (
-                        item.get("carrier") or
-                        (item.get("airlines")[0] if item.get("airlines") else None) or
-                        item.get("airline")
-                    )
-                    dep = item.get("departure") or _nested(item, first=True)
-                    arr = item.get("arrival") or _nested(item, first=False)
-                    results.append({
-                        "provider": "Kiwi via RapidAPI",
-                        "price": price,
-                        "carrier": carrier,
-                        "departure": dep,
-                        "arrival": arr,
-                        "link": item.get("booking_link") or item.get("deep_link") or ""
-                    })
+
+                # Return first non-empty result set
+                results = [_normalise(item) for item in data]
+                print(f"[Kiwi] Found {len(results)} result(s) for {src} -> {dst}")
                 return results
+
             except Exception as e:
-                print(f"[Kiwi] Error on {src}->{dst}: {e}")
+                print(f"[Kiwi] Error for {src} -> {dst}: {e}")
                 continue
 
-    # No results for any combination
+    # If we reach here, nothing matched across all fallbacks
+    print("[Kiwi] No results across all fallbacks.")
     return []
-
-def _nested(item, first=True):
-    route = item.get("route")
-    if isinstance(route, list) and route:
-        leg = route[0] if first else route[-1]
-        return leg.get("local_departure") if first else leg.get("local_arrival")
-    return None
