@@ -1,5 +1,5 @@
 # agent/smoke_test_kiwi.py
-# Mirrors RapidAPI sandbox for /round-trip and stays backwards-compatible with legacy flags.
+# Mirrors RapidAPI sandbox for /round-trip; supports both vendor and legacy flags without argparse conflicts.
 
 import os, sys, argparse, json
 from datetime import datetime, timedelta
@@ -11,7 +11,7 @@ HOST = "kiwi-com-cheap-flights.p.rapidapi.com"
 PATH = "/round-trip"
 BASE_URL = f"https://{HOST}{PATH}"
 
-# Minimal IATA→City mapping (used only if --source/--destination not provided)
+# Minimal IATA→City mapping (used only if vendor flags not provided)
 IATA_TO_CITY = {
     "EMA": "City:nottingham_gb",
     "BHX": "City:birmingham_gb",
@@ -32,9 +32,7 @@ def map_iata_to_vendor(origin_iata, dest_iata):
 
 def session_with_retries(total=3, backoff=0.8):
     retry = Retry(
-        total=total,
-        connect=total,
-        read=total,
+        total=total, connect=total, read=total,
         backoff_factor=backoff,
         status_forcelist=[429, 500, 502, 503, 504],
         allowed_methods=frozenset(["GET"]),
@@ -45,9 +43,9 @@ def session_with_retries(total=3, backoff=0.8):
 
 def parse_args():
     p = argparse.ArgumentParser(description="Kiwi RapidAPI /round-trip smoke test (sandbox parity + legacy flags)")
-    # Native sandbox-style params
-    p.add_argument("--source", default=None, help="e.g. 'Country:GB' or 'City:birmingham_gb'")
-    p.add_argument("--destination", default=None, help="e.g. 'Country:ES' or 'City:alicante_es'")
+    # Vendor/native flags (no conflicts)
+    p.add_argument("--sourceVendor", default=None, help="e.g. 'Country:GB' or 'City:birmingham_gb'")
+    p.add_argument("--destinationVendor", default=None, help="e.g. 'Country:ES' or 'City:alicante_es'")
     p.add_argument("--currency", default="gbp")
     p.add_argument("--adults", type=int, default=1)
     p.add_argument("--children", type=int, default=0)
@@ -55,15 +53,13 @@ def parse_args():
     p.add_argument("--limit", type=int, default=20)
     p.add_argument("--inboundDepartureDateStart", default=None)
     p.add_argument("--outboundDepartureDateStart", default=None)
-    # The sandbox typo; we’ll send it if provided or if we compute dates
+    # The sandbox typo; send if provided or computed
     p.add_argument("--outboundDepartmentDateStart", default=None)
     p.add_argument("--raw", action="store_true")
 
-    # Legacy flags (back-compat). If used, we compute the date params.
+    # Legacy flags (back-compat): IATA + date window
     p.add_argument("--origin", default=None, help="IATA (e.g. EMA)")
-    p.add_argument("--destinationIata", dest="destination_iata", default=None, help="IATA (e.g. ALC)")
-    p.add_argument("--destinationLegacy", dest="destination_legacy", default=None, help="Alias of --destinationIata")
-    p.add_argument("--destination", default=None, help="Used as either IATA (legacy) or vendor slug (native)")
+    p.add_argument("--destination", default=None, help="IATA (e.g. ALC)")
     p.add_argument("--startDate", default=None, help="YYYY-MM-DD")
     p.add_argument("--nights", default=None, help="Integer nights")
     return p.parse_args()
@@ -95,26 +91,22 @@ def main():
         sys.exit(1)
 
     # Resolve route parameters:
-    # Priority 1: native --source/--destination
-    src = args.source
-    dst = args.destination
+    # Priority 1: vendor/native flags
+    src_vendor = args.sourceVendor
+    dst_vendor = args.destinationVendor
 
-    # If not provided, try legacy IATA mapping
-    if not (src and dst):
-        # destination might be provided under different names; prefer explicit native if looks like City:/Country:
-        if args.origin or args.destination_iata or (args.destination and ":" not in args.destination):
-            iata_dest = args.destination_iata or args.destination_legacy or args.destination
-            src, dst = map_iata_to_vendor(args.origin, iata_dest)
+    # Priority 2: legacy IATA mapping if vendor flags not provided
+    if not (src_vendor and dst_vendor) and (args.origin or args.destination):
+        src_vendor, dst_vendor = map_iata_to_vendor(args.origin, args.destination)
 
-    # Final hard defaults if still missing
-    src = src or "Country:GB"
-    dst = dst or "Country:ES"
+    # Final defaults if still missing
+    src_vendor = src_vendor or "Country:GB"
+    dst_vendor = dst_vendor or "Country:ES"
 
-    # Dates: honour explicit sandbox params; if missing and we have legacy startDate/nights, compute them.
+    # Dates: honour explicit vendor params; otherwise compute from legacy
     in_start = args.inboundDepartureDateStart
     out_start = args.outboundDepartureDateStart
     out_typo = args.outboundDepartmentDateStart
-
     if not (in_start and (out_start or out_typo)) and args.startDate and args.nights:
         calc_in, calc_out, calc_typo = compute_dates_if_needed(args)
         in_start = in_start or calc_in
@@ -127,8 +119,8 @@ def main():
     }
 
     params = {
-        "source": src,
-        "destination": dst,
+        "source": src_vendor,
+        "destination": dst_vendor,
         "currency": args.currency,
         "locale": "en",
         "adults": args.adults,
@@ -154,7 +146,7 @@ def main():
         "limit": args.limit,
     }
 
-    # Add date filters if available (send BOTH outbound keys if we have them)
+    # Add date filters (send BOTH outbound keys if we have them)
     if in_start:
         params["inboundDepartureDateStart"] = in_start
     if out_start:
