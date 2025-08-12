@@ -1,12 +1,14 @@
 # agent/smoke_test_kiwi.py
-import os, sys, argparse, json, requests
+import os, sys, argparse, json, time
 from datetime import datetime
+import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 
 HOST = "kiwi-com-cheap-flights.p.rapidapi.com"
 PATH = "/round-trip"
 BASE_URL = f"https://{HOST}{PATH}"
 
-# Minimal mapper from IATA to vendor City:slug format (expand as needed)
 IATA_TO_CITY = {
     "EMA": "City:nottingham_gb",
     "BHX": "City:birmingham_gb",
@@ -17,7 +19,7 @@ IATA_TO_CITY = {
     "LTN": "City:london_gb",
     "BRS": "City:bristol_gb",
     "LPL": "City:liverpool_gb",
-    "ALC": "City:alicante_es"
+    "ALC": "City:alicante_es",
 }
 
 def map_origin_dest(origin: str|None, dest: str|None, fallback_source: str, fallback_dest: str):
@@ -27,20 +29,32 @@ def map_origin_dest(origin: str|None, dest: str|None, fallback_source: str, fall
 
 def parse_args():
     p = argparse.ArgumentParser(description="Kiwi-only smoke test via RapidAPI /round-trip")
-
-    # RapidAPI-native flags
+    # RapidAPI-native
     p.add_argument("--source", help="e.g. 'City:nottingham_gb' or 'Country:GB'")
     p.add_argument("--destination", help="e.g. 'City:alicante_es' or 'Country:ES'")
     p.add_argument("--adults", type=int, default=2)
     p.add_argument("--children", type=int, default=0)
     p.add_argument("--currency", default="gbp")
-    p.add_argument("--limit", type=int, default=5)
-
+    p.add_argument("--limit", type=int, default=3)  # lower default to reduce payload
+    p.add_argument("--raw", action="store_true", help="dump first 800 chars of body for debugging")
     # Back-compat flags (ignored by this endpoint except for mapping)
-    p.add_argument("--origin")      # IATA (e.g. EMA)
-    p.add_argument("--startDate")   # unused by this endpoint
-    p.add_argument("--nights")      # unused by this endpoint
+    p.add_argument("--origin")
+    p.add_argument("--startDate")
+    p.add_argument("--nights")
     return p.parse_args()
+
+def session_with_retries(total=3, backoff=0.8):
+    retry = Retry(
+        total=total,
+        connect=total,
+        read=total,
+        backoff_factor=backoff,
+        status_forcelist=[429, 500, 502, 503, 504],
+        allowed_methods=frozenset(["GET"])
+    )
+    s = requests.Session()
+    s.mount("https://", HTTPAdapter(max_retries=retry))
+    return s
 
 def main():
     args = parse_args()
@@ -50,11 +64,10 @@ def main():
         print("❌ Missing environment variable: RAPIDAPI_KIWI_KEY")
         sys.exit(1)
 
-    # Decide source/destination
     src = args.source
     dst = args.destination
     if not (src and dst):
-        # Map old flags to vendor format if new flags not provided
+        # If native not provided, map IATA→vendor slugs, else fall back to Country
         src, dst = map_origin_dest(args.origin, args.destination, "Country:GB", "Country:ES")
 
     headers = {"X-RapidAPI-Key": api_key, "X-RapidAPI-Host": HOST}
@@ -93,22 +106,26 @@ def main():
           f"adults={params['adults']}, children={params['children']}, currency={params['currency']}, limit={params['limit']}")
     print()
 
+    s = session_with_retries(total=3, backoff=0.9)
     try:
-        resp = requests.get(BASE_URL, headers=headers, params=params, timeout=30)
+        resp = s.get(BASE_URL, headers=headers, params=params, timeout=12)  # faster fail, retries handle bursts
         if resp.status_code != 200:
             print(f"❌ HTTP {resp.status_code}")
-            print(resp.text[:1000])
+            if args.raw:
+                print(resp.text[:800])
             sys.exit(2)
     except requests.RequestException as e:
-        print(f"❌ Request failed: {e}")
+        print(f"❌ Request failed after retries: {e}")
         sys.exit(2)
 
-    # Parse response
+    if args.raw:
+        print("[RAW]", resp.text[:800])
+
     try:
         payload = resp.json()
     except json.JSONDecodeError:
         print("❌ Response was not JSON:")
-        print(resp.text[:1000])
+        print(resp.text[:800])
         sys.exit(2)
 
     data = payload.get("data", payload if isinstance(payload, list) else [])
@@ -117,7 +134,9 @@ def main():
         price = ((item.get("price") or {}).get("amount")
                  if isinstance(item.get("price"), dict)
                  else item.get("price") or item.get("totalPrice"))
-        carrier = item.get("carrier") or _first(item.get("airlines")) or item.get("airline") or "?"
+        carrier = (item.get("carrier")
+                   or (item.get("airlines")[0] if isinstance(item.get("airlines"), list) and item.get("airlines") else "?")
+                   or item.get("airline") or "?")
         dep = item.get("departure") or _nested_route(item, first=True)
         arr = item.get("arrival") or _nested_route(item, first=False)
         link = item.get("booking_link") or item.get("deep_link") or ""
@@ -129,12 +148,8 @@ def main():
         print("\nNo results. Try:")
         print("- Broader selectors: --source 'Country:GB' --destination 'Country:ES'")
         print("- Different city mapping: --origin BHX or --source 'City:birmingham_gb'")
-        print("- Lower limit: --limit 1 (mitigate rate limits)")
-
-def _first(x):
-    if isinstance(x, list) and x:
-        return x[0]
-    return None
+        print("- Lower limit: --limit 1 (mitigate payload and rate limits)")
+        print("- Add --raw to inspect the first 800 chars of the response body")
 
 def _nested_route(item, first=True):
     route = item.get("route")
