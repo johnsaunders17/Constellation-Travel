@@ -1,42 +1,45 @@
-name: Smoke Test – Amadeus Flights
+name: Smoke Test - Amadeus Flights
 
 on:
   workflow_dispatch:
     inputs:
       origin:
-        description: Origin IATA
+        description: "Origin IATA"
         required: false
         default: "EMA"
       destination:
-        description: Destination IATA
+        description: "Destination IATA"
         required: false
         default: "ALC"
       startDate:
-        description: Start date (YYYY-MM-DD)
+        description: "Start date (YYYY-MM-DD)"
         required: false
         default: "2025-08-25"
       nights:
-        description: Nights
+        description: "Nights"
         required: false
         default: "4"
       adults:
-        description: Adults
+        description: "Adults"
         required: false
         default: "2"
       children:
-        description: Children
+        description: "Children"
         required: false
         default: "0"
 
 jobs:
-  amadeus-flights:
+  amadeus_flights:
     runs-on: ubuntu-latest
-    permissions: { contents: read }
+    permissions:
+      contents: read
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
-      - uses: actions/setup-python@v5
+      - name: Set up Python
+        uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
@@ -47,7 +50,7 @@ jobs:
           pip install -r requirements.txt
 
       - name: Run Amadeus Flights smoke
-        working-directory: agent              # <-- run from agent/
+        working-directory: agent
         env:
           AMADEUS_API_KEY: ${{ secrets.AMADEUS_API_KEY }}
           AMADEUS_API_SECRET: ${{ secrets.AMADEUS_API_SECRET }}
