@@ -23,14 +23,28 @@ def save_results(data, output_dir="results"):
     print(f"[INFO] Results saved to {output_file} and latest.json")
 
 def evaluate_deals(params):
-    print("[INFO] Fetching flight data via Kiwi...")
+    # --- FLIGHTS ---
+    ### TEMP: Amadeus Flights primary, Kiwi fallback
+    from providers.amadeus_flights import search_roundtrip as get_amadeus_flights
+
+    print("[INFO] Fetching flight data via Amadeus Flights (temporary primary)...")
     try:
-        flights = get_kiwi_deals(params)
+        flights = get_amadeus_flights(params) or []
     except requests.HTTPError as e:
-        print(f"[ERROR] Kiwi provider HTTP error: {e}")
+        print(f"[ERROR] Amadeus Flights HTTP error: {e}")
         flights = []
+
+    if not flights:
+        print("[WARN] No Amadeus Flights results, falling back to Kiwi...")
+        try:
+            flights = get_kiwi_deals(params)
+        except requests.HTTPError as e:
+            print(f"[ERROR] Kiwi provider HTTP error: {e}")
+            flights = []
+
     print(f"[INFO] Found {len(flights)} flight options.")
 
+    # --- HOTELS ---
     print("[INFO] Fetching hotel data via Amadeus...")
     try:
         hotels = get_amadeus_hotels(params)
@@ -39,6 +53,7 @@ def evaluate_deals(params):
         hotels = []
     print(f"[INFO] Found {len(hotels)} hotel options.")
 
+    # --- MATCH & FILTER ---
     results = []
     for flight in flights:
         for hotel in hotels:
@@ -57,6 +72,7 @@ def evaluate_deals(params):
     sorted_results = sorted(results, key=lambda x: x["perPerson"])
     print(f"[INFO] {len(sorted_results)} matching deals found.")
     return sorted_results
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
