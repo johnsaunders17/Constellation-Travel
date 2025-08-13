@@ -133,18 +133,55 @@ def get_amadeus_hotels(params: dict) -> list[dict]:
 
     payload = r.json()
     data = payload.get("data", [])
-    out = []
+        out = []
     for item in data:
         hotel = item.get("hotel", {}) or {}
-        rating = hotel.get("rating")
-        try:
-            stars = int(rating) if rating is not None else 0
-        except ValueError:
-            stars = 0
+        # --- Robust star rating extraction ---
+        # Amadeus may return:
+        # - hotel.rating: "3" or "THREE_STAR"
+        # - hotel.category: "THREE_STAR" / "FOUR_STAR"
+        # - hotel.stars: 3 (rare)
+        rating_raw = (
+            hotel.get("rating")
+            or hotel.get("stars")
+            or hotel.get("category")
+            or ""
+        )
+
+        stars = 0
+        if isinstance(rating_raw, (int, float)):
+            try:
+                stars = int(rating_raw)
+            except Exception:
+                stars = 0
+        elif isinstance(rating_raw, str):
+            s = rating_raw.strip().upper()
+            # numeric string?
+            if s.isdigit():
+                stars = int(s)
+            else:
+                # map "FOUR_STAR", "THREE_STAR_SUPERIOR", etc.
+                if "FIVE" in s: stars = 5
+                elif "FOUR" in s: stars = 4
+                elif "THREE" in s: stars = 3
+                elif "TWO" in s: stars = 2
+                elif "ONE" in s: stars = 1
+                else:
+                    stars = 0
 
         for offer in item.get("offers", []):
             price_total = offer.get("price", {}).get("total")
-            board = (offer.get("boardType") or offer.get("mealPlan", {}).get("code") or "").upper()
+
+            # --- Robust board/meal plan extraction with sensible default ---
+            board = (
+                offer.get("boardType")
+                or (offer.get("mealPlan") or {}).get("code")
+                or (offer.get("mealPlan") or {}).get("type")
+                or "Unknown"
+            )
+            # Normalise to uppercase short codes where possible
+            board = str(board).upper()
+
             out.append({
                 "provider": "Amadeus Hotels",
                 "providerCode": "amadeus",
@@ -156,4 +193,5 @@ def get_amadeus_hotels(params: dict) -> list[dict]:
                 "checkOut": check_out,
                 "raw": item,
             })
+
     return out
