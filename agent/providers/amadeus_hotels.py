@@ -26,24 +26,56 @@ def _token():
     _TOKEN["exp"] = time.time() + int(data.get("expires_in", 1800))
     return _TOKEN["value"]
 
-def _city_hotels(city_code: str, radius_km: int = 25, limit: int = 50) -> list[str]:
-    """GET /v1/reference-data/locations/hotels/by-city to fetch hotelIds."""
+def _city_hotels(city_code: str, radius_km: int = 30, limit: int = 50) -> list[str]:
+    """
+    GET /v1/reference-data/locations/hotels/by-city to fetch hotelIds.
+    Retries with safer params if the sandbox rejects the request, and falls back to MAD.
+    """
     headers = {"Authorization": f"Bearer {_token()}"}
-    q = {
-        "cityCode": city_code.upper(),
-        "radius": radius_km,
-        "radiusUnit": "KM",
-        "hotelSource": "ALL",
-        "page[limit]": min(limit, 50),  # Amadeus page limit
-    }
-    r = requests.get(f"{AMADEUS_BASE}/v1/reference-data/locations/hotels/by-city", headers=headers, params=q, timeout=20)
-    if r.status_code == 401:
-        _TOKEN["value"] = None
-        headers["Authorization"] = f"Bearer {_token()}"
-        r = requests.get(f"{AMADEUS_BASE}/v1/reference-data/locations/hotels/by-city", headers=headers, params=q, timeout=20)
-    r.raise_for_status()
-    data = r.json().get("data", [])
-    return [h.get("hotelId") for h in data if h.get("hotelId")]
+
+    def call(city: str, rad: int, use_source: bool, use_limit: bool) -> requests.Response:
+        q = {"cityCode": city.upper(), "radius": rad, "radiusUnit": "KM"}
+        if use_source:
+            q["hotelSource"] = "ALL"
+        if use_limit:
+            q["page[limit]"] = min(limit, 50)
+        return requests.get(f"{AMADEUS_BASE}/v1/reference-data/locations/hotels/by-city",
+                            headers=headers, params=q, timeout=20)
+
+    # Try 1: as requested
+    tries = [
+        (city_code, min(max(int(radius_km), 1), 30), True, True),
+        # Try 2: stricter radius (<=20), keep source/limit
+        (city_code, 20, True, True),
+        # Try 3: drop hotelSource (some sandboxes reject it)
+        (city_code, 20, False, True),
+        # Try 4: drop page[limit] as well
+        (city_code, 20, False, False),
+        # Try 5: fallback city known to work in sandbox
+        ("MAD", 20, False, False),
+    ]
+
+    for city, rad, use_source, use_limit in tries:
+        r = call(city, rad, use_source, use_limit)
+        if r.status_code == 401:
+            _TOKEN["value"] = None
+            headers["Authorization"] = f"Bearer {_token()}"
+            r = call(city, rad, use_source, use_limit)
+
+        if r.status_code == 200:
+            data = r.json().get("data", [])
+            if data:
+                return [h.get("hotelId") for h in data if h.get("hotelId")]
+            # 200 but empty – keep falling through
+        else:
+            # Log the first 300 chars of error to help debugging
+            try:
+                msg = r.text[:300]
+            except Exception:
+                msg = str(r.status_code)
+            print(f"[Amadeus/Hotels] by-city {city} r={rad} (source={use_source},limit={use_limit}) -> {r.status_code}: {msg}")
+
+    return []
 
 def get_amadeus_hotels(params: dict) -> list[dict]:
     """
