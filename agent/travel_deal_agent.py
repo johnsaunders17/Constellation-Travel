@@ -5,6 +5,8 @@ from datetime import datetime
 import requests
 from providers.kiwi import get_kiwi_deals
 from providers.amadeus import get_amadeus_hotels
+from providers.google_flights import search_google_flights
+from providers.booking_com import search_booking_hotels
 
 def load_config(path):
     with open(path, 'r') as f:
@@ -24,39 +26,84 @@ def save_results(data, output_dir="results"):
 
 def evaluate_deals(params):
     # --- FLIGHTS ---
-    ### TEMP: Amadeus Flights primary, Kiwi fallback
-    from providers.amadeus_flights import search_roundtrip as get_amadeus_flights
-
-    print("[INFO] Fetching flight data via Amadeus Flights (temporary primary)...")
+    ### Multi-provider flight search with fallbacks
+    print("[INFO] Fetching flight data from multiple providers...")
+    all_flights = []
+    
+    # Try Google Flights first (often has good deals)
     try:
-        flights = get_amadeus_flights(params) or []
-    except requests.HTTPError as e:
-        print(f"[ERROR] Amadeus Flights HTTP error: {e}")
-        flights = []
-
-    if not flights:
-        print("[WARN] No Amadeus Flights results, falling back to Kiwi...")
+        google_flights = search_google_flights(params) or []
+        all_flights.extend(google_flights)
+        print(f"[INFO] Google Flights: {len(google_flights)} options")
+    except Exception as e:
+        print(f"[ERROR] Google Flights failed: {e}")
+    
+    # Try Amadeus Flights
+    try:
+        from providers.amadeus_flights import search_roundtrip as get_amadeus_flights
+        amadeus_flights = get_amadeus_flights(params) or []
+        all_flights.extend(amadeus_flights)
+        print(f"[INFO] Amadeus Flights: {len(amadeus_flights)} options")
+    except Exception as e:
+        print(f"[ERROR] Amadeus Flights failed: {e}")
+    
+    # Fallback to Kiwi if needed
+    if not all_flights:
+        print("[WARN] No primary flight results, trying Kiwi...")
         try:
-            flights = get_kiwi_deals(params)
-        except requests.HTTPError as e:
-            print(f"[ERROR] Kiwi provider HTTP error: {e}")
-            flights = []
-
-    print(f"[INFO] Found {len(flights)} flight options.")
+            kiwi_flights = get_kiwi_deals(params) or []
+            all_flights.extend(kiwi_flights)
+            print(f"[INFO] Kiwi: {len(kiwi_flights)} options")
+        except Exception as e:
+            print(f"[ERROR] Kiwi provider failed: {e}")
+    
+    # Remove duplicates and sort by price
+    unique_flights = []
+    seen_prices = set()
+    for flight in sorted(all_flights, key=lambda x: x.get("price", 0)):
+        price_key = f"{flight.get('carrier', '')}-{flight.get('price', 0)}-{flight.get('departure', '')}"
+        if price_key not in seen_prices:
+            unique_flights.append(flight)
+            seen_prices.add(price_key)
+    
+    print(f"[INFO] Total unique flights found: {len(unique_flights)}")
 
     # --- HOTELS ---
-    print("[INFO] Fetching hotel data via Amadeus...")
+    ### Multi-provider hotel search
+    print("[INFO] Fetching hotel data from multiple providers...")
+    all_hotels = []
+    
+    # Try Booking.com first (often has competitive rates)
     try:
-        hotels = get_amadeus_hotels(params)
-    except requests.HTTPError as e:
-        print(f"[ERROR] Amadeus provider HTTP error: {e}")
-        hotels = []
-    print(f"[INFO] Found {len(hotels)} hotel options.")
+        booking_hotels = search_booking_hotels(params) or []
+        all_hotels.extend(booking_hotels)
+        print(f"[INFO] Booking.com: {len(booking_hotels)} options")
+    except Exception as e:
+        print(f"[ERROR] Booking.com failed: {e}")
+    
+    # Try Amadeus Hotels
+    try:
+        amadeus_hotels = get_amadeus_hotels(params) or []
+        all_hotels.extend(amadeus_hotels)
+        print(f"[INFO] Amadeus Hotels: {len(amadeus_hotels)} options")
+    except Exception as e:
+        print(f"[ERROR] Amadeus Hotels failed: {e}")
+    
+    # Remove duplicates and sort by price
+    unique_hotels = []
+    seen_hotel_keys = set()
+    for hotel in sorted(all_hotels, key=lambda x: x.get("price", 0)):
+        hotel_key = f"{hotel.get('name', '')}-{hotel.get('stars', 0)}-{hotel.get('board', '')}"
+        if hotel_key not in seen_hotel_keys:
+            unique_hotels.append(hotel)
+            seen_hotel_keys.add(hotel_key)
+    
+    print(f"[INFO] Total unique hotels found: {len(unique_hotels)}")
 
     # --- MATCH & FILTER ---
     results = []
-    for flight in flights:
-        for hotel in hotels:
+    for flight in unique_flights:
+        for hotel in unique_hotels:
             if hotel["stars"] >= params["minStars"] and params["board"].lower() in hotel["board"].lower():
                 total = float(flight["price"]) + float(hotel["price"])
                 per_person = total / params["adults"]
