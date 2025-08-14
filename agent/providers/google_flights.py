@@ -1,43 +1,54 @@
 import os
 import requests
 from datetime import datetime, timedelta
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 # RapidAPI Google Flights configuration
-HOST = os.getenv("RAPIDAPI_GOOGLE_FLIGHTS_HOST", "google-flights-search.p.rapidapi.com")
+HOST = os.getenv("RAPIDAPI_GOOGLE_FLIGHTS_HOST", "google-flights2.p.rapidapi.com")
 BASE_URL = f"https://{HOST}"
 
 def _normalize_flight_data(flight_data: dict) -> dict:
     """Normalize Google Flights data to match our standard format"""
     try:
         # Extract price information
-        price_info = flight_data.get("price", {})
-        if isinstance(price_info, dict):
-            price = price_info.get("amount") or price_info.get("total")
+        price = flight_data.get("price", 0)
+        
+        # Extract airline information from the first flight segment
+        flights = flight_data.get("flights", [])
+        if flights and len(flights) > 0:
+            first_flight = flights[0]
+            airline = first_flight.get("airline", "Unknown")
+            flight_number = first_flight.get("flight_number", "")
+            carrier = f"{airline} {flight_number}".strip()
         else:
-            price = price_info
+            carrier = "Unknown"
         
-        # Extract airline information
-        airline = flight_data.get("airline") or flight_data.get("carrier")
-        if isinstance(airline, list):
-            airline = airline[0] if airline else "Unknown"
+        # Extract departure and arrival times
+        departure_time = flight_data.get("departure_time", "")
+        arrival_time = flight_data.get("arrival_time", "")
         
-        # Extract route information
-        route = flight_data.get("route", {})
-        departure = route.get("departure") or route.get("departureTime")
-        arrival = route.get("arrival") or route.get("arrivalTime")
+        # Extract duration
+        duration_info = flight_data.get("duration", {})
+        duration = duration_info.get("text", "") if isinstance(duration_info, dict) else str(duration_info)
         
-        # Extract booking link
-        link = flight_data.get("bookingLink") or flight_data.get("deepLink") or ""
+        # Extract stops
+        stops = flight_data.get("stops", 0)
+        
+        # Extract booking token
+        booking_token = flight_data.get("booking_token", "")
         
         return {
             "provider": "Google Flights via RapidAPI",
             "price": float(price) if price else 0.0,
-            "carrier": airline or "Unknown",
-            "departure": departure,
-            "arrival": arrival,
-            "link": link,
-            "duration": flight_data.get("duration"),
-            "stops": flight_data.get("stops", 0)
+            "carrier": carrier,
+            "departure": departure_time,
+            "arrival": arrival_time,
+            "link": f"https://www.google.com/travel/flights?token={booking_token}" if booking_token else "",
+            "duration": duration,
+            "stops": stops
         }
     except Exception as e:
         print(f"[ERROR] Failed to normalize Google Flights data: {e}")
@@ -71,14 +82,15 @@ def search_google_flights(params: dict) -> list[dict]:
     
     # Prepare search parameters
     search_params = {
-        "from": params["origin"],
-        "to": params["destination"],
-        "date": params["startDate"],
-        "returnDate": return_date.strftime("%Y-%m-%d"),
+        "departure_id": params["origin"],
+        "arrival_id": params["destination"],
+        "outbound_date": params["startDate"],
+        "travel_class": params.get("cabin", "ECONOMY").upper(),
         "adults": params.get("adults", 1),
-        "children": params.get("children", 0),
-        "cabin": params.get("cabin", "economy"),
-        "currency": "GBP"
+        "currency": "GBP",
+        "language_code": "en-GB",
+        "country_code": "GB",
+        "search_type": "best"
     }
     
     headers = {
@@ -89,7 +101,7 @@ def search_google_flights(params: dict) -> list[dict]:
     try:
         print(f"[INFO] Searching Google Flights: {params['origin']} → {params['destination']}")
         response = requests.get(
-            f"{BASE_URL}/search",
+            f"{BASE_URL}/api/v1/searchFlights",
             headers=headers,
             params=search_params,
             timeout=30
@@ -97,18 +109,29 @@ def search_google_flights(params: dict) -> list[dict]:
         response.raise_for_status()
         
         data = response.json()
-        flights = data.get("flights", [])
         
-        if not flights:
+        # Extract flights from the new response structure
+        itineraries = data.get("data", {}).get("itineraries", {})
+        top_flights = itineraries.get("topFlights", [])
+        other_flights = itineraries.get("otherFlights", [])
+        
+        # Combine all flights
+        all_flights = top_flights + other_flights
+        
+        if not all_flights:
             print("[INFO] No Google Flights results found")
             return []
         
         # Normalize and filter results
         normalized_flights = []
-        for flight in flights:
-            normalized = _normalize_flight_data(flight)
-            if normalized and normalized.get("price", 0) > 0:
-                normalized_flights.append(normalized)
+        for flight in all_flights:
+            try:
+                normalized = _normalize_flight_data(flight)
+                if normalized and normalized.get("price", 0) > 0:
+                    normalized_flights.append(normalized)
+            except Exception as e:
+                print(f"[WARN] Failed to normalize flight: {e}")
+                continue
         
         print(f"[INFO] Found {len(normalized_flights)} Google Flights options")
         return normalized_flights

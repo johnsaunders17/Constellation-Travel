@@ -23,6 +23,7 @@ def test_normalize_hotel_data():
         "hotel": {
             "name": "Test Hotel",
             "rating": 4.5,
+            "stars": 4,
             "address": {"city": "Alicante"}
         },
         "price": {"amount": 120.00, "currency": "GBP"},
@@ -120,7 +121,7 @@ def test_error_handling():
     
     # Test with invalid parameters
     try:
-        results = search_booking_hotels({"invalid": "params"})
+        results = search_booking_hotels({"invalid": "params", "startDate": "2025-08-25", "nights": 4, "destination": "ALC"})
         # Should handle gracefully without crashing
         print("✅ Invalid parameters handling test passed")
     except Exception as e:
@@ -136,9 +137,9 @@ def test_filtering():
     
     # Mock hotel data with different star ratings
     mock_hotels = [
-        {"hotel": {"name": "3 Star Hotel"}, "price": {"amount": 80}, "board": "RO"},
-        {"hotel": {"name": "4 Star Hotel"}, "price": {"amount": 120}, "board": "HB"},
-        {"hotel": {"name": "5 Star Hotel"}, "price": {"amount": 200}, "board": "FB"}
+        {"hotel": {"name": "3 Star Hotel"}, "price": {"amount": 80}, "board": "RO", "stars": 3},
+        {"hotel": {"name": "4 Star Hotel"}, "price": {"amount": 120}, "board": "HB", "stars": 4},
+        {"hotel": {"name": "5 Star Hotel"}, "price": {"amount": 200}, "board": "FB", "stars": 5}
     ]
     
     # Simulate the filtering logic

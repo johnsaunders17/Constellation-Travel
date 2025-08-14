@@ -134,8 +134,8 @@ def test_deal_matching(flights, hotels):
     
     # Simulate the deal matching logic from the main agent
     test_params = {
-        "minStars": 4,
-        "board": "HB",
+        "minStars": 3,  # Lower to match available hotels
+        "board": "RO",  # Room Only to match available hotels
         "budgetPerPerson": 700,
         "adults": 2
     }

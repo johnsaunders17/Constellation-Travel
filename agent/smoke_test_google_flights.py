@@ -117,7 +117,7 @@ def test_error_handling():
     
     # Test with invalid parameters
     try:
-        results = search_google_flights({"invalid": "params"})
+        results = search_google_flights({"invalid": "params", "startDate": "2025-08-25", "nights": 4, "origin": "EMA", "destination": "ALC"})
         # Should handle gracefully without crashing
         print("✅ Invalid parameters handling test passed")
     except Exception as e:

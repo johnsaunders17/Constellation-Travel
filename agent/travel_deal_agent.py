@@ -38,6 +38,15 @@ def evaluate_deals(params):
     except Exception as e:
         print(f"[ERROR] Google Flights failed: {e}")
     
+    # Try Booking.com Flights
+    try:
+        from providers.booking_com_flights import search_booking_flights
+        booking_flights = search_booking_flights(params) or []
+        all_flights.extend(booking_flights)
+        print(f"[INFO] Booking.com Flights: {len(booking_flights)} options")
+    except Exception as e:
+        print(f"[ERROR] Booking.com Flights failed: {e}")
+    
     # Try Amadeus Flights
     try:
         from providers.amadeus_flights import search_roundtrip as get_amadeus_flights

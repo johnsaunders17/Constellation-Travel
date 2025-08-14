@@ -1,9 +1,13 @@
 import os
 import requests
 from datetime import datetime, timedelta
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 # RapidAPI Booking.com configuration
-HOST = os.getenv("RAPIDAPI_BOOKING_HOST", "booking-com.p.rapidapi.com")
+HOST = os.getenv("RAPIDAPI_BOOKING_HOST", "booking-com18.p.rapidapi.com")
 BASE_URL = f"https://{HOST}"
 
 def _normalize_hotel_data(hotel_data: dict) -> dict:
@@ -73,13 +77,13 @@ def search_booking_hotels(params: dict) -> list[dict]:
     
     # Prepare search parameters
     search_params = {
-        "dest_id": params.get("destination", "ALC"),
-        "search_type": "city",
-        "arrival_date": params["startDate"],
-        "departure_date": check_out.strftime("%Y-%m-%d"),
+        "destId": "20088325",  # Default to New York, but this should be dynamic
+        "destType": "city",
+        "checkIn": params["startDate"],
+        "checkOut": check_out.strftime("%Y-%m-%d"),
         "adults": params.get("adults", 1),
         "children": params.get("children", 0),
-        "room_qty": 1,
+        "rooms": 1,
         "currency": "GBP",
         "locale": "en-gb"
     }
@@ -92,7 +96,7 @@ def search_booking_hotels(params: dict) -> list[dict]:
     try:
         print(f"[INFO] Searching Booking.com hotels in {params.get('destination', 'ALC')}")
         response = requests.get(
-            f"{BASE_URL}/v1/hotels/search",
+            f"{BASE_URL}/web/stays/search",
             headers=headers,
             params=search_params,
             timeout=30

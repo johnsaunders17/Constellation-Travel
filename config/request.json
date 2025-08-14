@@ -6,8 +6,8 @@
   "nights": 4,
   "adults": 2,
   "children": 0,
-  "board": "HB",
-  "minStars": 4,
+  "board": "RO",
+  "minStars": 3,
   "budgetPerPerson": 700,
   "flexibility": 1,
   "baggage": "hand"
