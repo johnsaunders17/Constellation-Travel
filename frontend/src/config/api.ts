@@ -7,7 +7,7 @@ export const API_CONFIG = {
   },
   // Production (GitHub Pages)
   production: {
-    baseUrl: 'https://your-backend-url.com', // You'll need to deploy your backend
+    baseUrl: 'https://constellation-travel-backend.onrender.com',
     timeout: 15000
   }
 };
