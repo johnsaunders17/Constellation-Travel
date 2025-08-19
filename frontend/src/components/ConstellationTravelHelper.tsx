@@ -496,7 +496,7 @@ export default function ConstellationTravelHelper() {
                         )}
                       </div>
                       <div className="deal-total">
-                        Total: {formatPrice(deal.total)}
+                        Total: {formatPrice(deal.totalPrice)}
                       </div>
                       {deal.isTestData && (
                         <div className="test-data-badge">
