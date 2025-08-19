@@ -384,7 +384,84 @@ def get_deals():
         results_path = os.path.join(os.path.dirname(__file__), '..', 'results', 'latest.json')
         
         if not os.path.exists(results_path):
-            return jsonify({'error': 'No results found'}), 404
+            # Return mock data instead of error when no results file exists
+            mock_deals = [
+                {
+                    'id': 1,
+                    'type': 'flight',
+                    'origin': 'EMA',
+                    'destination': 'ALC',
+                    'departureDate': '2024-09-15',
+                    'returnDate': '2024-09-22',
+                    'price': 189,
+                    'airline': 'Ryanair',
+                    'stops': 0,
+                    'duration': '2h 45m',
+                    'perPerson': 189,
+                    'flight': {
+                        'origin': 'EMA',
+                        'destination': 'ALC',
+                        'departure': '2024-09-15',
+                        'arrival': '2024-09-22',
+                        'carrier': 'Ryanair'
+                    },
+                    'hotel': {
+                        'stars': 4
+                    }
+                },
+                {
+                    'id': 2,
+                    'type': 'hotel',
+                    'name': 'Hotel Marina Delfin',
+                    'location': 'Alicante',
+                    'checkIn': '2024-09-15',
+                    'checkOut': '2024-09-22',
+                    'price': 420,
+                    'stars': 4,
+                    'board': 'RO',
+                    'perPerson': 210,
+                    'flight': {
+                        'origin': 'EMA',
+                        'destination': 'ALC',
+                        'departure': '2024-09-15',
+                        'arrival': '2024-09-22',
+                        'carrier': 'Hotel'
+                    },
+                    'hotel': {
+                        'stars': 4
+                    }
+                },
+                {
+                    'id': 3,
+                    'type': 'package',
+                    'origin': 'EMA',
+                    'destination': 'ALC',
+                    'departureDate': '2024-09-15',
+                    'returnDate': '2024-09-22',
+                    'flightPrice': 189,
+                    'hotelPrice': 420,
+                    'totalPrice': 609,
+                    'savings': 50,
+                    'perPerson': 304,
+                    'flight': {
+                        'origin': 'EMA',
+                        'destination': 'ALC',
+                        'departure': '2024-09-15',
+                        'arrival': '2024-09-22',
+                        'carrier': 'Ryanair'
+                    },
+                    'hotel': {
+                        'stars': 4
+                    }
+                }
+            ]
+            
+            return jsonify({
+                'deals': mock_deals,
+                'total': len(mock_deals),
+                'timestamp': datetime.now().isoformat(),
+                'source': 'mock_data'
+            })
         
         with open(results_path, 'r') as f:
             data = json.load(f)
@@ -442,8 +519,101 @@ def search_deals():
         results_path = os.path.join(os.path.dirname(__file__), '..', 'results', 'latest.json')
         
         if not os.path.exists(results_path):
-            return jsonify({'error': 'No results found'}), 404
+            # Return mock data instead of error when no results file exists
+            mock_deals = [
+                {
+                    'id': 1,
+                    'type': 'flight',
+                    'origin': 'EMA',
+                    'destination': 'ALC',
+                    'departureDate': '2024-09-15',
+                    'returnDate': '2024-09-22',
+                    'price': 189,
+                    'airline': 'Ryanair',
+                    'stops': 0,
+                    'duration': '2h 45m',
+                    'perPerson': 189,
+                    'flight': {
+                        'origin': 'EMA',
+                        'destination': 'ALC',
+                        'departure': '2024-09-15',
+                        'arrival': '2024-09-22',
+                        'carrier': 'Ryanair'
+                    },
+                    'hotel': {
+                        'stars': 4
+                    }
+                },
+                {
+                    'id': 2,
+                    'type': 'hotel',
+                    'name': 'Hotel Marina Delfin',
+                    'location': 'Alicante',
+                    'checkIn': '2024-09-15',
+                    'checkOut': '2024-09-22',
+                    'price': 420,
+                    'stars': 4,
+                    'board': 'RO',
+                    'perPerson': 210,
+                    'flight': {
+                        'origin': 'EMA',
+                        'destination': 'ALC',
+                        'departure': '2024-09-15',
+                        'arrival': '2024-09-22',
+                        'carrier': 'Hotel'
+                    },
+                    'hotel': {
+                        'stars': 4
+                    }
+                },
+                {
+                    'id': 3,
+                    'type': 'package',
+                    'origin': 'EMA',
+                    'destination': 'ALC',
+                    'departureDate': '2024-09-15',
+                    'returnDate': '2024-09-22',
+                    'flightPrice': 189,
+                    'hotelPrice': 420,
+                    'totalPrice': 609,
+                    'savings': 50,
+                    'perPerson': 304,
+                    'flight': {
+                        'origin': 'EMA',
+                        'destination': 'ALC',
+                        'departure': '2024-09-15',
+                        'arrival': '2024-09-22',
+                        'carrier': 'Ryanair'
+                    },
+                    'hotel': {
+                        'stars': 4
+                    }
+                }
+            ]
+            
+            # Apply search filters to mock data
+            if data.get('budgetPerPerson'):
+                try:
+                    budget = float(data['budgetPerPerson'])
+                    mock_deals = [deal for deal in mock_deals if deal.get('perPerson', 0) <= budget]
+                except ValueError:
+                    pass
+            
+            if data.get('minStars'):
+                try:
+                    min_stars = int(data['minStars'])
+                    mock_deals = [deal for deal in mock_deals if deal.get('hotel', {}).get('stars', 0) >= min_stars]
+                except ValueError:
+                    pass
+            
+            return jsonify({
+                'deals': mock_deals,
+                'total': len(mock_deals),
+                'timestamp': datetime.now().isoformat(),
+                'source': 'mock_data'
+            })
         
+        # If we have real data, load it
         with open(results_path, 'r') as f:
             results_data = json.load(f)
         
