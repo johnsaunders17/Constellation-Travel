@@ -61,6 +61,81 @@ def get_mock_flight_data(origin, destination, date, adults=1):
         }
     ]
 
+def get_mock_deals_data():
+    """Generate mock deals data for demo mode"""
+    return [
+        {
+            'id': 1,
+            'type': 'flight',
+            'origin': 'EMA',
+            'destination': 'ALC',
+            'departureDate': '2024-09-15',
+            'returnDate': '2024-09-22',
+            'price': 189,
+            'airline': 'Ryanair',
+            'stops': 0,
+            'duration': '2h 45m',
+            'perPerson': 189,
+            'totalPrice': 189,
+            'flight': {
+                'origin': 'EMA',
+                'destination': 'ALC',
+                'departure': '2024-09-15',
+                'arrival': '2024-09-22',
+                'carrier': 'Ryanair'
+            },
+            'hotel': {
+                'stars': 4
+            }
+        },
+        {
+            'id': 2,
+            'type': 'hotel',
+            'name': 'Hotel Marina Delfin',
+            'location': 'Alicante',
+            'checkIn': '2024-09-15',
+            'checkOut': '2024-09-22',
+            'price': 420,
+            'stars': 4,
+            'board': 'RO',
+            'perPerson': 210,
+            'totalPrice': 420,
+            'flight': {
+                'origin': 'EMA',
+                'destination': 'ALC',
+                'departure': '2024-09-15',
+                'arrival': '2024-09-22',
+                'carrier': 'Hotel'
+            },
+            'hotel': {
+                'stars': 4
+            }
+        },
+        {
+            'id': 3,
+            'type': 'package',
+            'origin': 'EMA',
+            'destination': 'ALC',
+            'departureDate': '2024-09-15',
+            'returnDate': '2024-09-22',
+            'flightPrice': 189,
+            'hotelPrice': 420,
+            'totalPrice': 609,
+            'savings': 50,
+            'perPerson': 304,
+            'flight': {
+                'origin': 'EMA',
+                'destination': 'ALC',
+                'departure': '2024-09-15',
+                'arrival': '2024-09-22',
+                'carrier': 'Ryanair'
+            },
+            'hotel': {
+                'stars': 4
+            }
+        }
+    ]
+
 def get_rapidapi_headers(service):
     """Get RapidAPI headers for different services"""
     if RAPIDAPI_KEY == 'demo-key' or not RAPIDAPI_KEY:
