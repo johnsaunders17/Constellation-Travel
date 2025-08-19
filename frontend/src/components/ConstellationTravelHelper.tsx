@@ -23,8 +23,8 @@ export default function ConstellationTravelHelper() {
   const [searchParams, setSearchParams] = useState<SearchParams>({
     origin: 'EMA',
     destination: 'ALC',
-    departureDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 30 days from now
-    nights: 7,
+    departureDate: new Date().toISOString().split('T')[0], // Today's date
+    nights: 4,
     adults: 2,
     children: 0,
     cabin: 'ECONOMY',
@@ -498,6 +498,11 @@ export default function ConstellationTravelHelper() {
                       <div className="deal-total">
                         Total: {formatPrice(deal.total)}
                       </div>
+                      {deal.isTestData && (
+                        <div className="test-data-badge">
+                          🧪 {deal.dataSource || 'DEMO DATA'}
+                        </div>
+                      )}
                     </div>
 
                     <div className="deal-details">

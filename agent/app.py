@@ -77,6 +77,8 @@ def get_mock_deals_data():
             'duration': '2h 45m',
             'perPerson': 189,
             'totalPrice': 189,
+            'isTestData': True,
+            'dataSource': 'DEMO - Sample Flight Data',
             'flight': {
                 'origin': 'EMA',
                 'destination': 'ALC',
@@ -100,6 +102,8 @@ def get_mock_deals_data():
             'board': 'RO',
             'perPerson': 210,
             'totalPrice': 420,
+            'isTestData': True,
+            'dataSource': 'DEMO - Sample Hotel Data',
             'flight': {
                 'origin': 'EMA',
                 'destination': 'ALC',
@@ -123,6 +127,8 @@ def get_mock_deals_data():
             'totalPrice': 609,
             'savings': 50,
             'perPerson': 304,
+            'isTestData': True,
+            'dataSource': 'DEMO - Sample Package Deal',
             'flight': {
                 'origin': 'EMA',
                 'destination': 'ALC',
@@ -460,76 +466,7 @@ def get_deals():
         
         if not os.path.exists(results_path):
             # Return mock data instead of error when no results file exists
-            mock_deals = [
-                {
-                    'id': 1,
-                    'type': 'flight',
-                    'origin': 'EMA',
-                    'destination': 'ALC',
-                    'departureDate': '2024-09-15',
-                    'returnDate': '2024-09-22',
-                    'price': 189,
-                    'airline': 'Ryanair',
-                    'stops': 0,
-                    'duration': '2h 45m',
-                    'perPerson': 189,
-                    'flight': {
-                        'origin': 'EMA',
-                        'destination': 'ALC',
-                        'departure': '2024-09-15',
-                        'arrival': '2024-09-22',
-                        'carrier': 'Ryanair'
-                    },
-                    'hotel': {
-                        'stars': 4
-                    }
-                },
-                {
-                    'id': 2,
-                    'type': 'hotel',
-                    'name': 'Hotel Marina Delfin',
-                    'location': 'Alicante',
-                    'checkIn': '2024-09-15',
-                    'checkOut': '2024-09-22',
-                    'price': 420,
-                    'stars': 4,
-                    'board': 'RO',
-                    'perPerson': 210,
-                    'flight': {
-                        'origin': 'EMA',
-                        'destination': 'ALC',
-                        'departure': '2024-09-15',
-                        'arrival': '2024-09-22',
-                        'carrier': 'Hotel'
-                    },
-                    'hotel': {
-                        'stars': 4
-                    }
-                },
-                {
-                    'id': 3,
-                    'type': 'package',
-                    'origin': 'EMA',
-                    'destination': 'ALC',
-                    'departureDate': '2024-09-15',
-                    'returnDate': '2024-09-22',
-                    'flightPrice': 189,
-                    'hotelPrice': 420,
-                    'totalPrice': 609,
-                    'savings': 50,
-                    'perPerson': 304,
-                    'flight': {
-                        'origin': 'EMA',
-                        'destination': 'ALC',
-                        'departure': '2024-09-15',
-                        'arrival': '2024-09-22',
-                        'carrier': 'Ryanair'
-                    },
-                    'hotel': {
-                        'stars': 4
-                    }
-                }
-            ]
+            mock_deals = get_mock_deals_data()
             
             return jsonify({
                 'deals': mock_deals,
@@ -595,76 +532,7 @@ def search_deals():
         
         if not os.path.exists(results_path):
             # Return mock data instead of error when no results file exists
-            mock_deals = [
-                {
-                    'id': 1,
-                    'type': 'flight',
-                    'origin': 'EMA',
-                    'destination': 'ALC',
-                    'departureDate': '2024-09-15',
-                    'returnDate': '2024-09-22',
-                    'price': 189,
-                    'airline': 'Ryanair',
-                    'stops': 0,
-                    'duration': '2h 45m',
-                    'perPerson': 189,
-                    'flight': {
-                        'origin': 'EMA',
-                        'destination': 'ALC',
-                        'departure': '2024-09-15',
-                        'arrival': '2024-09-22',
-                        'carrier': 'Ryanair'
-                    },
-                    'hotel': {
-                        'stars': 4
-                    }
-                },
-                {
-                    'id': 2,
-                    'type': 'hotel',
-                    'name': 'Hotel Marina Delfin',
-                    'location': 'Alicante',
-                    'checkIn': '2024-09-15',
-                    'checkOut': '2024-09-22',
-                    'price': 420,
-                    'stars': 4,
-                    'board': 'RO',
-                    'perPerson': 210,
-                    'flight': {
-                        'origin': 'EMA',
-                        'destination': 'ALC',
-                        'departure': '2024-09-15',
-                        'arrival': '2024-09-22',
-                        'carrier': 'Hotel'
-                    },
-                    'hotel': {
-                        'stars': 4
-                    }
-                },
-                {
-                    'id': 3,
-                    'type': 'package',
-                    'origin': 'EMA',
-                    'destination': 'ALC',
-                    'departureDate': '2024-09-15',
-                    'returnDate': '2024-09-22',
-                    'flightPrice': 189,
-                    'hotelPrice': 420,
-                    'totalPrice': 609,
-                    'savings': 50,
-                    'perPerson': 304,
-                    'flight': {
-                        'origin': 'EMA',
-                        'destination': 'ALC',
-                        'departure': '2024-09-15',
-                        'arrival': '2024-09-22',
-                        'carrier': 'Ryanair'
-                    },
-                    'hotel': {
-                        'stars': 4
-                    }
-                }
-            ]
+            mock_deals = get_mock_deals_data()
             
             # Apply search filters to mock data
             if data.get('budgetPerPerson'):

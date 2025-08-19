@@ -152,6 +152,20 @@
 .airport-input {
   width: 100%;
   box-sizing: border-box;
+  padding: 1rem 1.5rem;
+  font-size: 1.1rem;
+  border: 2px solid #e1e5e9;
+  border-radius: 12px;
+  background: #fff;
+  transition: all 0.3s ease;
+  min-height: 60px;
+}
+
+.airport-input:focus {
+  outline: none;
+  border-color: #667eea;
+  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+  transform: translateY(-2px);
 }
 
 .airport-dropdown {
@@ -367,6 +381,19 @@
   border-radius: 4px;
   margin-top: 0.5rem;
   font-weight: 500;
+}
+
+.test-data-badge {
+  background: linear-gradient(135deg, #ffd93d, #ff6b6b);
+  color: #333;
+  padding: 0.5rem 1rem;
+  border-radius: 20px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-align: center;
+  margin-top: 0.5rem;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  border: 2px solid #fff;
 }
 
 .realtime-badge {
