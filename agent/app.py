@@ -14,10 +14,58 @@ app = Flask(__name__)
 CORS(app)  # Enable CORS for frontend
 
 # Import configuration
-from config import RAPIDAPI_KEY, RAPIDAPI_HOSTS
+try:
+    from config import RAPIDAPI_KEY, RAPIDAPI_HOSTS
+except ImportError:
+    # Fallback for deployment environments
+    import os
+    RAPIDAPI_KEY = os.getenv('RAPIDAPI_KEY', 'demo-key')
+    RAPIDAPI_HOSTS = {
+        'google_flights': 'google-flights2.p.rapidapi.com',
+        'booking_com': 'booking-com15.p.rapidapi.com',
+        'booking_com_flights': 'booking-com18.p.rapidapi.com',
+        'booking_com_tipsters': 'tipsters.p.rapidapi.com',
+        'flights_sky': 'flights-sky.p.rapidapi.com'
+    }
+
+def get_mock_flight_data(origin, destination, date, adults=1):
+    """Generate mock flight data for demo mode"""
+    return [
+        {
+            'id': f'flight1_{origin}_{destination}',
+            'origin': origin,
+            'destination': destination,
+            'departureTime': '06:30',
+            'arrivalTime': '09:15',
+            'duration': '2h 45m',
+            'price': 189 * adults,
+            'airline': 'Ryanair',
+            'stops': 0,
+            'aircraft': 'Boeing 737',
+            'date': date,
+            'currency': 'GBP'
+        },
+        {
+            'id': f'flight2_{origin}_{destination}',
+            'origin': origin,
+            'destination': destination,
+            'departureTime': '14:20',
+            'arrivalTime': '17:05',
+            'duration': '2h 45m',
+            'price': 245 * adults,
+            'airline': 'Jet2',
+            'stops': 0,
+            'aircraft': 'Airbus A321',
+            'date': date,
+            'currency': 'GBP'
+        }
+    ]
 
 def get_rapidapi_headers(service):
     """Get RapidAPI headers for different services"""
+    if RAPIDAPI_KEY == 'demo-key' or not RAPIDAPI_KEY:
+        print("⚠️ Warning: Using demo mode - no real API calls will be made")
+        return None
     return {
         'X-RapidAPI-Key': RAPIDAPI_KEY,
         'X-RapidAPI-Host': RAPIDAPI_HOSTS.get(service, 'google-flights2.p.rapidapi.com')
@@ -26,6 +74,12 @@ def get_rapidapi_headers(service):
 def search_flights_realtime(origin, destination, date, adults=1, currency='GBP'):
     """Search for real-time flights using RapidAPI"""
     try:
+        # Check if we have valid API credentials
+        headers = get_rapidapi_headers('google_flights')
+        if not headers:
+            print("⚠️ Demo mode: Returning mock flight data")
+            return get_mock_flight_data(origin, destination, date, adults)
+        
         # Convert date to proper format for Google Flights API
         try:
             # Google Flights expects date in YYYY-MM-DD format
@@ -57,7 +111,7 @@ def search_flights_realtime(origin, destination, date, adults=1, currency='GBP')
         
         google_response = requests.get(
             google_url, 
-            headers=get_rapidapi_headers('google_flights'),
+            headers=headers,
             params=google_params
         )
         
@@ -319,6 +373,15 @@ def generate_working_booking_links(carrier, airline_code, origin="EMA", destinat
     ])
     
     return links
+
+@app.route('/health', methods=['GET'])
+def health_check():
+    """Health check endpoint"""
+    return jsonify({
+        'status': 'healthy',
+        'timestamp': datetime.now().isoformat(),
+        'api_mode': 'demo' if RAPIDAPI_KEY == 'demo-key' else 'live'
+    })
 
 @app.route('/api/deals', methods=['GET'])
 def get_deals():

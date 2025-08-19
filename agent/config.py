@@ -3,7 +3,7 @@ import os
 
 # RapidAPI Configuration
 # Get your API key from: https://rapidapi.com/
-RAPIDAPI_KEY = os.getenv('RAPIDAPI_GOOGLE_FLIGHTS_KEY', 'your-rapidapi-key-here')
+RAPIDAPI_KEY = os.getenv('RAPIDAPI_KEY', 'your-rapidapi-key-here')
 
 # API Hosts
 RAPIDAPI_HOSTS = {
