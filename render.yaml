@@ -4,11 +4,11 @@ services:
     env: python
     plan: free
     buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn wsgi:app --bind 0.0.0.0:$PORT
+    startCommand: gunicorn wsgi:app --bind 0.0.0.0:$PORT --timeout 120 --workers 1
     envVars:
       - key: PYTHON_VERSION
         value: 3.9.16
       - key: RAPIDAPI_KEY
-        sync: false
+        value: demo-key
       - key: RAPIDAPI_HOSTS
-        sync: false
+        value: '{"google_flights": "google-flights2.p.rapidapi.com", "booking_com": "booking-com15.p.rapidapi.com", "booking_com_flights": "booking-com18.p.rapidapi.com", "booking_com_tipsters": "tipsters.p.rapidapi.com", "flights_sky": "flights-sky.p.rapidapi.com"}'
