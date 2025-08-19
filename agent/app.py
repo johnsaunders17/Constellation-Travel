@@ -374,14 +374,7 @@ def generate_working_booking_links(carrier, airline_code, origin="EMA", destinat
     
     return links
 
-@app.route('/health', methods=['GET'])
-def health_check():
-    """Health check endpoint"""
-    return jsonify({
-        'status': 'healthy',
-        'timestamp': datetime.now().isoformat(),
-        'api_mode': 'demo' if RAPIDAPI_KEY == 'demo-key' else 'live'
-    })
+
 
 @app.route('/api/deals', methods=['GET'])
 def get_deals():
