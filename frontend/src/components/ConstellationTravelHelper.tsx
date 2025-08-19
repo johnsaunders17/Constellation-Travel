@@ -41,25 +41,131 @@ export default function ConstellationTravelHelper() {
   const [destinationSearch, setDestinationSearch] = useState('');
   const [showOriginDropdown, setShowOriginDropdown] = useState(false);
   const [showDestinationDropdown, setShowDestinationDropdown] = useState(false);
+  
+  // New state for real-time flight search
+  const [realtimeFlights, setRealtimeFlights] = useState<any[] | null>(null);
+  const [isSearchingRealtime, setIsSearchingRealtime] = useState(false);
+  const [showRealtimeResults, setShowRealtimeResults] = useState(false);
 
   // Filter airports for dropdowns
   const filteredOriginAirports = searchAirports(originSearch);
   const filteredDestinationAirports = searchAirports(destinationSearch);
 
+  // Load initial deals when component mounts
+  useEffect(() => {
+    const loadInitialDeals = async () => {
+      try {
+        const response = await fetch('http://localhost:5001/api/deals');
+        if (response.ok) {
+          const data = await response.json();
+          setDeals(data.deals || []);
+        }
+      } catch (error) {
+        console.error('Failed to load initial deals:', error);
+      }
+    };
+    
+    loadInitialDeals();
+  }, []);
+
   const handleSearch = async () => {
+    console.log('🔍 Search button clicked!');
+    console.log('Search params:', searchParams);
+    
     setIsSearching(true);
     setShowResults(true);
     
     try {
-      // In a real app, you'd call your backend API here
-      // For now, we'll simulate the search and show existing results
-      const results = await fetchLatestResults(import.meta.env.BASE_URL);
-      setDeals(results?.deals ?? []);
+      const searchBody = {
+        budgetPerPerson: searchParams.budgetPerPerson,
+        minStars: searchParams.minStars,
+        departureDate: searchParams.departureDate, // NEW: Include departure date for filtering
+        // Note: origin/destination filtering not available in current data
+      };
+      
+      console.log('Sending search request with body:', searchBody);
+      
+      // Call the enhanced Flask API with search parameters
+      const response = await fetch('http://localhost:5001/api/search', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(searchBody),
+      });
+      
+      console.log('Response status:', response.status);
+      
+      if (!response.ok) {
+        throw new Error('Search failed');
+      }
+      
+      const data = await response.json();
+      console.log('Search response:', data);
+      console.log('Found deals:', data.deals?.length || 0);
+      
+      setDeals(data.deals || []);
     } catch (error) {
       console.error('Search failed:', error);
       setDeals([]);
     } finally {
       setIsSearching(false);
+    }
+  };
+
+  const handleRealtimeSearch = async () => {
+    console.log('🚀 Real-time search button clicked!');
+    console.log('Real-time search params:', {
+      origin: searchParams.origin,
+      destination: searchParams.destination,
+      date: searchParams.departureDate,
+      adults: searchParams.adults
+    });
+    
+    setIsSearchingRealtime(true);
+    setShowRealtimeResults(true);
+    
+    try {
+      const realtimeBody = {
+        origin: searchParams.origin,
+        destination: searchParams.destination,
+        date: searchParams.departureDate,
+        adults: searchParams.adults,
+        currency: 'GBP'
+      };
+      
+      console.log('Sending real-time search request with body:', realtimeBody);
+      
+      // Call the new real-time flight search API
+      const response = await fetch('http://localhost:5001/api/flights/search', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(realtimeBody),
+      });
+      
+      console.log('Real-time response status:', response.status);
+      
+      if (!response.ok) {
+        throw new Error('Real-time search failed');
+      }
+      
+      const data = await response.json();
+      console.log('Real-time search response:', data);
+      
+      if (data.success && data.data) {
+        setRealtimeFlights(data.data);
+        console.log('Real-time flights found:', data.data.length);
+      } else {
+        setRealtimeFlights([]);
+        console.log('No real-time flights found');
+      }
+    } catch (error) {
+      console.error('Real-time search failed:', error);
+      setRealtimeFlights([]);
+    } finally {
+      setIsSearchingRealtime(false);
     }
   };
 
@@ -319,7 +425,7 @@ export default function ConstellationTravelHelper() {
                   </div>
                 )}
 
-                {/* Search Button */}
+                {/* Search Buttons */}
                 <div className="form-row">
                   <button
                     type="button"
@@ -328,6 +434,15 @@ export default function ConstellationTravelHelper() {
                     className="search-button"
                   >
                     {isSearching ? 'Searching...' : 'Search Deals'}
+                  </button>
+                  
+                  <button
+                    type="button"
+                    onClick={handleRealtimeSearch}
+                    disabled={isSearchingRealtime}
+                    className="search-button realtime"
+                  >
+                    {isSearchingRealtime ? 'Searching...' : '🔍 Real-Time Search'}
                   </button>
                 </div>
               </div>
@@ -345,7 +460,10 @@ export default function ConstellationTravelHelper() {
               </button>
               <h2>Travel Deals Found</h2>
               <div className="search-summary">
-                {getAirportDisplay(searchParams.origin)} → {getAirportDisplay(searchParams.destination)}
+                <div>Showing deals for your budget and preferences</div>
+                <div className="search-note">
+                  Note: Origin/destination filtering not available in current data
+                </div>
                 {searchParams.tripType === 'roundtrip' && ` • ${searchParams.nights} nights`}
                 {searchParams.includeHotels && ` • Hotels included`}
               </div>
@@ -359,11 +477,14 @@ export default function ConstellationTravelHelper() {
             ) : deals && deals.length > 0 ? (
               <div className="deals-grid">
                 {deals.slice(0, 20).map((deal, idx) => (
-                  <div key={idx} className="deal-card">
+                  <div key={idx} className={`deal-card ${!deal.flight.isDateValid ? 'invalid-date' : ''}`}>
                     <div className="deal-header">
                       <div className="deal-price">
                         <span className="price-main">{formatPrice(deal.perPerson)}</span>
                         <span className="price-sub">per person</span>
+                        {!deal.flight.isDateValid && (
+                          <span className="invalid-date-badge">⚠️ Invalid Date</span>
+                        )}
                       </div>
                       <div className="deal-total">
                         Total: {formatPrice(deal.total)}
@@ -379,7 +500,20 @@ export default function ConstellationTravelHelper() {
                         </div>
                         <div className="detail-row">
                           <span className="label">Departure:</span>
-                          <span className="value">{new Date(deal.flight.departure).toLocaleDateString()}</span>
+                          <span className="value">
+                            {deal.flight.departureDate ? 
+                              new Date(deal.flight.departureDate).toLocaleDateString('en-GB', {
+                                weekday: 'short',
+                                year: 'numeric',
+                                month: 'short',
+                                day: 'numeric'
+                              }) : 
+                              deal.flight.departure
+                            }
+                            {deal.flight.departureError && (
+                              <span className="date-error">⚠️ {deal.flight.departureError}</span>
+                            )}
+                          </span>
                         </div>
                         <div className="detail-row">
                           <span className="label">Duration:</span>
@@ -389,11 +523,41 @@ export default function ConstellationTravelHelper() {
                           <span className="label">Stops:</span>
                           <span className="value">{deal.flight.stops}</span>
                         </div>
-                        {deal.flight.link && (
-                          <a href={deal.flight.link} target="_blank" rel="noopener noreferrer" className="book-link">
-                            Book Flight
-                          </a>
-                        )}
+                        {/* Booking Links */}
+                        <div className="booking-links">
+                          <h5>Book This Flight:</h5>
+                          <div className="booking-info">
+                            <p className="booking-note">
+                              ✈️ <strong>Direct Airline</strong> - Book directly with Ryanair (when available)
+                            </p>
+                            <p className="booking-note">
+                              🔍 <strong>Search & Compare</strong> - Find the best prices across all airlines
+                            </p>
+                          </div>
+                          {deal.flight.bookingLinks && deal.flight.bookingLinks.length > 0 ? (
+                            <div className="booking-options">
+                              {deal.flight.bookingLinks.map((link, linkIdx) => (
+                                <a 
+                                  key={linkIdx}
+                                  href={link.url} 
+                                  target="_blank" 
+                                  rel="noopener noreferrer" 
+                                  className={`book-link ${link.type === 'Direct Airline' ? 'primary' : 'secondary'}`}
+                                  title={`Click to ${link.description.toLowerCase()}`}
+                                >
+                                  {link.type === 'Direct Airline' ? '✈️ ' : '🔍 '}
+                                  {link.description}
+                                </a>
+                              ))}
+                            </div>
+                          ) : deal.flight.link ? (
+                            <a href={deal.flight.link} target="_blank" rel="noopener noreferrer" className="book-link">
+                              Book Flight
+                            </a>
+                          ) : (
+                            <span className="no-booking">No booking link available</span>
+                          )}
+                        </div>
                       </div>
 
                       {deal.hotel && (
@@ -430,6 +594,110 @@ export default function ConstellationTravelHelper() {
               <div className="no-results">
                 <p>No deals found for your search criteria.</p>
                 <p>Try adjusting your dates, destination, or budget.</p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Real-Time Flight Results */}
+        {showRealtimeResults && (
+          <div className="results-container">
+            <div className="results-header">
+              <button
+                onClick={() => setShowRealtimeResults(false)}
+                className="back-button"
+              >
+                ← New Search
+              </button>
+              <h2>Real-Time Flight Results</h2>
+              <div className="search-summary">
+                <div>Live search results from Google Flights API</div>
+                <div className="search-note">
+                  Real-time pricing and availability
+                </div>
+                {searchParams.origin} → {searchParams.destination} • {searchParams.departureDate}
+              </div>
+            </div>
+
+            {isSearchingRealtime ? (
+              <div className="loading">
+                <div className="spinner"></div>
+                <p>Searching for real-time flights...</p>
+              </div>
+            ) : realtimeFlights && realtimeFlights.length > 0 ? (
+              <div className="deals-grid">
+                {realtimeFlights.slice(0, 20).map((flight, idx) => (
+                  <div key={idx} className="deal-card realtime">
+                    <div className="deal-header">
+                      <div className="deal-price">
+                        <span className="price-main">£{flight.price || 'N/A'}</span>
+                        <span className="price-sub">per person</span>
+                        <span className="realtime-badge">🔄 LIVE</span>
+                      </div>
+                      <div className="deal-total">
+                        Airline: {flight.airline || 'Unknown'}
+                      </div>
+                    </div>
+
+                    <div className="deal-details">
+                      <div className="flight-details">
+                        <h4>✈️ Flight Details</h4>
+                        <div className="detail-row">
+                          <span className="label">From:</span>
+                          <span className="value">{searchParams.origin}</span>
+                        </div>
+                        <div className="detail-row">
+                          <span className="label">To:</span>
+                          <span className="value">{searchParams.destination}</span>
+                        </div>
+                        <div className="detail-row">
+                          <span className="label">Date:</span>
+                          <span className="value">{searchParams.departureDate}</span>
+                        </div>
+                        {flight.duration && (
+                          <div className="detail-row">
+                            <span className="label">Duration:</span>
+                            <span className="value">{flight.duration}</span>
+                          </div>
+                        )}
+                        {flight.stops !== undefined && (
+                          <div className="detail-row">
+                            <span className="label">Stops:</span>
+                            <span className="value">{flight.stops}</span>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Real-time booking links */}
+                      <div className="booking-links">
+                        <h5>Book This Flight:</h5>
+                        <div className="booking-options">
+                          <a 
+                            href={`https://www.google.com/travel/flights?hl=en&curr=GBP&f=0&t=1&q=Flights%20from%20${searchParams.origin}%20to%20${searchParams.destination}%20on%20${searchParams.departureDate}`}
+                            target="_blank" 
+                            rel="noopener noreferrer" 
+                            className="book-link primary"
+                          >
+                            🔍 Search on Google Flights
+                          </a>
+                          <a 
+                            href={`https://www.skyscanner.net/flights/${searchParams.origin}/${searchParams.destination}/${searchParams.departureDate}`}
+                            target="_blank" 
+                            rel="noopener noreferrer" 
+                            className="book-link secondary"
+                          >
+                            Compare on Skyscanner
+                          </a>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="no-results">
+                <p>No real-time flights found for your search criteria.</p>
+                <p>Try adjusting your dates, destination, or check if the RapidAPI key is configured.</p>
               </div>
             )}
           </div>

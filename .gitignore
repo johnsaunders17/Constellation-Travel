@@ -48,3 +48,5 @@ results/
 .env
 .env
 .env
+frontend/node_modules/
+# Allow built frontend files for GitHub Pages
