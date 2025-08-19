@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { airports, searchAirports, Airport } from '../config/airports';
 import { fetchLatestResults, Deal } from '../lib/results';
+import { buildApiUrl, API_ENDPOINTS, MOCK_DATA } from '../config/api';
 import './ConstellationTravelHelper.css';
 
 interface SearchParams {
@@ -55,13 +56,19 @@ export default function ConstellationTravelHelper() {
   useEffect(() => {
     const loadInitialDeals = async () => {
       try {
-        const response = await fetch('http://localhost:5001/api/deals');
+        const response = await fetch(buildApiUrl(API_ENDPOINTS.deals));
         if (response.ok) {
           const data = await response.json();
           setDeals(data.deals || []);
+        } else {
+          // Fallback to mock data if API fails
+          console.log('API failed, using mock data');
+          setDeals(MOCK_DATA.deals);
         }
       } catch (error) {
-        console.error('Failed to load initial deals:', error);
+        console.error('Failed to load initial deals, using mock data:', error);
+        // Fallback to mock data
+        setDeals(MOCK_DATA.deals);
       }
     };
     
@@ -86,7 +93,7 @@ export default function ConstellationTravelHelper() {
       console.log('Sending search request with body:', searchBody);
       
       // Call the enhanced Flask API with search parameters
-      const response = await fetch('http://localhost:5001/api/search', {
+      const response = await fetch(buildApiUrl(API_ENDPOINTS.search), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -106,8 +113,9 @@ export default function ConstellationTravelHelper() {
       
       setDeals(data.deals || []);
     } catch (error) {
-      console.error('Search failed:', error);
-      setDeals([]);
+      console.error('Search failed, using mock data:', error);
+      // Fallback to mock data
+      setDeals(MOCK_DATA.deals);
     } finally {
       setIsSearching(false);
     }
@@ -137,7 +145,7 @@ export default function ConstellationTravelHelper() {
       console.log('Sending real-time search request with body:', realtimeBody);
       
       // Call the new real-time flight search API
-      const response = await fetch('http://localhost:5001/api/flights/search', {
+      const response = await fetch(buildApiUrl(API_ENDPOINTS.flightsSearch), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -162,8 +170,9 @@ export default function ConstellationTravelHelper() {
         console.log('No real-time flights found');
       }
     } catch (error) {
-      console.error('Real-time search failed:', error);
-      setRealtimeFlights([]);
+      console.error('Real-time search failed, using mock data:', error);
+      // Fallback to mock data
+      setRealtimeFlights(MOCK_DATA.flights);
     } finally {
       setIsSearchingRealtime(false);
     }
