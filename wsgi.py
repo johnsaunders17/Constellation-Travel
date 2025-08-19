@@ -13,6 +13,11 @@ try:
     def test():
         return {'message': 'Main app is working!', 'routes': [str(rule) for rule in app.url_map.iter_rules()]}
         
+    # Add a root route for the main app
+    @app.route('/')
+    def home():
+        return {'message': 'Constellation Travel Backend is running!', 'status': 'healthy'}
+        
 except ImportError as e:
     print(f"❌ Import error: {e}")
     # Create a minimal fallback app
