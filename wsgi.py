@@ -7,6 +7,12 @@ sys.path.insert(0, os.path.dirname(__file__))
 try:
     from agent.app import app
     print("✅ Successfully imported Flask app")
+    
+    # Add a simple test route to verify the app is working
+    @app.route('/test')
+    def test():
+        return {'message': 'Main app is working!', 'routes': [str(rule) for rule in app.url_map.iter_rules()]}
+        
 except ImportError as e:
     print(f"❌ Import error: {e}")
     # Create a minimal fallback app

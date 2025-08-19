@@ -54,7 +54,18 @@ export const MOCK_DATA = {
       price: 189,
       airline: 'Ryanair',
       stops: 0,
-      duration: '2h 45m'
+      duration: '2h 45m',
+      isDateValid: true,
+      flight: {
+        departure: '2024-09-15',
+        arrival: '2024-09-22',
+        carrier: 'Ryanair',
+        isDateValid: true
+      },
+      hotel: {
+        stars: 4,
+        isDateValid: true
+      }
     },
     {
       id: 2,
@@ -65,7 +76,18 @@ export const MOCK_DATA = {
       checkOut: '2024-09-22',
       price: 420,
       stars: 4,
-      board: 'RO'
+      board: 'RO',
+      isDateValid: true,
+      flight: {
+        departure: '2024-09-15',
+        arrival: '2024-09-22',
+        carrier: 'Hotel',
+        isDateValid: true
+      },
+      hotel: {
+        stars: 4,
+        isDateValid: true
+      }
     },
     {
       id: 3,
@@ -77,7 +99,18 @@ export const MOCK_DATA = {
       flightPrice: 189,
       hotelPrice: 420,
       totalPrice: 609,
-      savings: 50
+      savings: 50,
+      isDateValid: true,
+      flight: {
+        departure: '2024-09-15',
+        arrival: '2024-09-22',
+        carrier: 'Ryanair',
+        isDateValid: true
+      },
+      hotel: {
+        stars: 4,
+        isDateValid: true
+      }
     }
   ],
   flights: [
