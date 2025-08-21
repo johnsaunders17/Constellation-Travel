@@ -15,7 +15,12 @@ CORS(app)  # Enable CORS for frontend
 
 # Import configuration
 try:
-    from config import RAPIDAPI_KEY, RAPIDAPI_HOSTS
+    from agent.config import (
+        RAPIDAPI_KEY,
+        RAPIDAPI_HOSTS,
+        RAPIDAPI_FLIGHTS_SKY_KEY,
+        RAPIDAPI_BOOKING_TIPSTERS_KEY,
+    )
 except ImportError:
     # Fallback for deployment environments
     import os
@@ -27,6 +32,8 @@ except ImportError:
         'booking_com_tipsters': 'tipsters.p.rapidapi.com',
         'flights_sky': 'flights-sky.p.rapidapi.com'
     }
+    RAPIDAPI_FLIGHTS_SKY_KEY = os.getenv('RAPIDAPI_SKYSCRAPER_KEY', RAPIDAPI_KEY)
+    RAPIDAPI_BOOKING_TIPSTERS_KEY = os.getenv('RAPIDAPI_BOOKING_KEY', RAPIDAPI_KEY)
 
 def get_mock_flight_data(origin, destination, date, adults=1):
     """Generate mock flight data for demo mode"""
@@ -158,8 +165,8 @@ def search_flights_realtime(origin, destination, date, adults=1, currency='GBP')
         # Check if we have valid API credentials
         headers = get_rapidapi_headers('google_flights')
         if not headers:
-            print("⚠️ Demo mode: Returning mock flight data")
-            return get_mock_flight_data(origin, destination, date, adults)
+            print("❌ No RapidAPI credentials configured for Google Flights. Skipping provider.")
+            return None
         
         # Convert date to proper format for Google Flights API
         try:
@@ -234,8 +241,6 @@ def search_flights_sky(origin, destination, date, adults=1, currency='GBP'):
             'cabin_class': 'ECONOMY'
         }
         
-        # Use the specific Flights Sky API key
-        from config import RAPIDAPI_FLIGHTS_SKY_KEY
         sky_headers = {
             'X-RapidAPI-Key': RAPIDAPI_FLIGHTS_SKY_KEY,
             'X-RapidAPI-Host': 'flights-sky.p.rapidapi.com'
@@ -286,8 +291,6 @@ def search_booking_com_tipsters(origin, destination, date, adults=1, currency='G
             'cabin_class': 'ECONOMY'
         }
         
-        # Use the specific Booking.com Tipsters API key
-        from config import RAPIDAPI_BOOKING_TIPSTERS_KEY
         booking_headers = {
             'X-RapidAPI-Key': RAPIDAPI_BOOKING_TIPSTERS_KEY,
             'X-RapidAPI-Host': 'tipsters.p.rapidapi.com'
@@ -461,20 +464,10 @@ def generate_working_booking_links(carrier, airline_code, origin="EMA", destinat
 def get_deals():
     """Get travel deals from the latest results"""
     try:
-        # Load the latest results
+        # Load the latest results from generated dataset; if missing, surface a clear error
         results_path = os.path.join(os.path.dirname(__file__), '..', 'results', 'latest.json')
-        
         if not os.path.exists(results_path):
-            # Return mock data instead of error when no results file exists
-            mock_deals = get_mock_deals_data()
-            
-            return jsonify({
-                'deals': mock_deals,
-                'total': len(mock_deals),
-                'timestamp': datetime.now().isoformat(),
-                'source': 'mock_data'
-            })
-        
+            return jsonify({'error': 'No results available. Please generate latest results.'}), 404
         with open(results_path, 'r') as f:
             data = json.load(f)
         
@@ -529,34 +522,8 @@ def search_deals():
         
         # Load the latest results
         results_path = os.path.join(os.path.dirname(__file__), '..', 'results', 'latest.json')
-        
         if not os.path.exists(results_path):
-            # Return mock data instead of error when no results file exists
-            mock_deals = get_mock_deals_data()
-            
-            # Apply search filters to mock data
-            if data.get('budgetPerPerson'):
-                try:
-                    budget = float(data['budgetPerPerson'])
-                    mock_deals = [deal for deal in mock_deals if deal.get('perPerson', 0) <= budget]
-                except ValueError:
-                    pass
-            
-            if data.get('minStars'):
-                try:
-                    min_stars = int(data['minStars'])
-                    mock_deals = [deal for deal in mock_deals if deal.get('hotel', {}).get('stars', 0) >= min_stars]
-                except ValueError:
-                    pass
-            
-            return jsonify({
-                'deals': mock_deals,
-                'total': len(mock_deals),
-                'timestamp': datetime.now().isoformat(),
-                'source': 'mock_data'
-            })
-        
-        # If we have real data, load it
+            return jsonify({'error': 'No results available. Please generate latest results.'}), 404
         with open(results_path, 'r') as f:
             results_data = json.load(f)
         

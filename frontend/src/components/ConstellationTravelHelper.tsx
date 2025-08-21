@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { airports, searchAirports, Airport } from '../config/airports';
 import { fetchLatestResults, Deal } from '../lib/results';
-import { buildApiUrl, API_ENDPOINTS, MOCK_DATA } from '../config/api';
+import { buildApiUrl, API_ENDPOINTS } from '../config/api';
 import './ConstellationTravelHelper.css';
 
 interface SearchParams {
@@ -61,14 +61,12 @@ export default function ConstellationTravelHelper() {
           const data = await response.json();
           setDeals(data.deals || []);
         } else {
-          // Fallback to mock data if API fails
-          console.log('API failed, using mock data');
-          setDeals(MOCK_DATA.deals);
+          console.error('Failed to load initial deals: HTTP', response.status);
+          setDeals([]);
         }
       } catch (error) {
-        console.error('Failed to load initial deals, using mock data:', error);
-        // Fallback to mock data
-        setDeals(MOCK_DATA.deals);
+        console.error('Failed to load initial deals:', error);
+        setDeals([]);
       }
     };
     
@@ -113,9 +111,8 @@ export default function ConstellationTravelHelper() {
       
       setDeals(data.deals || []);
     } catch (error) {
-      console.error('Search failed, using mock data:', error);
-      // Fallback to mock data
-      setDeals(MOCK_DATA.deals);
+      console.error('Search failed:', error);
+      setDeals([]);
     } finally {
       setIsSearching(false);
     }
@@ -170,9 +167,8 @@ export default function ConstellationTravelHelper() {
         console.log('No real-time flights found');
       }
     } catch (error) {
-      console.error('Real-time search failed, using mock data:', error);
-      // Fallback to mock data
-      setRealtimeFlights(MOCK_DATA.flights);
+      console.error('Real-time search failed:', error);
+      setRealtimeFlights([]);
     } finally {
       setIsSearchingRealtime(false);
     }
